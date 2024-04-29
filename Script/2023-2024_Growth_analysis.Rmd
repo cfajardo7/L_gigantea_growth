@@ -1,0 +1,97 @@
+---
+title: "Statistical Analysis of Growth Data"
+author: "Cindy Fajardo"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.path = "../Output/")
+```
+
+#Welcome
+In this Rmarkdown file you will find all of the statistical analysis for the owl limpet growth data.
+
+#Libraries
+```{r, Libraries}
+library("rerddap")
+library(tidyverse)
+library("tidync")
+library("doParallel")
+library(lubridate)
+library(patchwork)
+library(viridis)
+library(here)
+library(kableExtra)
+library(hrbrthemes)
+library(emmeans)
+library(agricolae)
+library(vegan)
+library(performance)
+library(broom)
+library(car)
+library(lme4)
+library(lmerTest)
+library(pscl)
+library(ggridges)
+library(devtools)
+library(pairwiseAdonis)
+```
+
+#Read in CSV
+In this chunk, I am reading in the csv's that are relevant to growth data ONLY
+```{r, Read in CSV}
+feb_cnm_shell_length <- read_csv(here("Data","2024_02_CNM_OL_SL_Data.csv"))
+master_sl <- read_csv(here("Data","Master_CNM_OL_SL_Data.csv")) %>%
+mutate(sex=ifelse(SL_mm>= 50, "female", "male"))
+```
+
+#Linear Models
+In this chunks I will store most of my linear models
+```{r, Linear}
+mod_season_size <- lm(sqrt(SL_mm)~Season, data = master_sl)  
+ anova(mod_season_size)
+ 
+check_model(mod_season_size)
+```
+
+#Density Data
+In this chunk I analyzed density data
+```{r}
+Density_Data <- master_sl %>%
+   group_by(Season, Plot_Name)%>%
+   count()%>%
+   mutate(limpet_density_m2 = n/20)
+ 
+ # run model for dependent variable ~ independent, then for normality, etc, interpret model
+ mod_density_season <-lm(limpet_density_m2~Season, data = Density_Data)
+check_model(mod_density_season)
+anova(mod_density_season) 
+summary(mod_density_season)
+
+ggplot(Density_Data, aes(x=Plot_Name,
+                         y=limpet_density_m2,
+                       color=Season))+
+         geom_boxplot()+
+  scale_color_brewer(palette = "Set1")
+```
+
+#ttest of SL winter and Fall
+```{r, ttest of SL winter and Fall}
+by_season <- master_sl %>%
+  select(Season, SL_mm) %>% 
+  group_by(Season) %>% 
+  mutate(sqrt_sl = sqrt(SL_mm))
+
+qqPlot(by_season$sqrt_sl)
+
+season_ttest <- t.test(log(SL_mm)~Season, data = by_season)
+season_ttest
+
+season_wilcoxtest <- wilcox.test(SL_mm~Season, data = by_season, paired=FALSE)
+season_wilcoxtest
+
+```
