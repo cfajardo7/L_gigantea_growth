@@ -44,29 +44,53 @@ library(pairwiseAdonis)
 #Read in CSV
 In this chunk, I am reading in the csv's that are relevant to growth data ONLY
 ```{r, Read in CSV}
-feb_cnm_shell_length <- read_csv(here("Data","2024_02_CNM_OL_SL_Data.csv"))
+#feb_cnm_shell_length <- read_csv(here("Data","2024_02_CNM_OL_SL_Data.csv"))
 master_sl <- read_csv(here("Data","Master_CNM_OL_SL_Data.csv")) %>%
 mutate(sex=ifelse(SL_mm>= 50, "female", "male"))
 ```
 
 
-#Simple Statistics
-In this chunk, I am looking a simple stats like mean, max, min, standard deviation, standard error, variance, etc
+#Filtering Data
+Filtered data to respective month of collection
 ```{r, Simple Statistics}
-winter_data <- filter(master_sl, Season=="Winter")
-feb_mean <- mean(winter_data$SL_mm)
-fall_data <- filter(master_sl, Season=="Fall")
-september_mean <- mean(fall_data$SL_mm)
-max(feb_cnm_shell_length$SL_mm)
-min(feb_cnm_shell_length$SL_mm)
-
-master_sl
+Feb_data <- filter(master_sl, Date=="2024_02")
+Sep_data <- filter(master_sl, Date == "2023_09")
+Dec_data <- filter(master_sl, Date == "2023_12")
+March_data <- filter(master_sl, Date =="2024_03")
+June_data <- filter(master_sl, Date == "2024_06")
 ```
 
+#Simple Statistics
+In this chunk, I am looking a simple stats like mean, max, min, standard deviation, standard error, variance, etc
+```{r}
+sep_SL_mean <- mean(Sep_data$SL_mm)
+dec_SL_mean <- mean(Dec_data$SL_mm)
+feb_SL_mean <- mean(Feb_data$SL_mm)
+march_SL_mean <- mean(March_data$SL_mm)
+june_SL_mean <- mean(June_data$SL_mm)
+
+max(Sep_data$SL_mm)
+min(Sep_data$SL_mm)
+
+max(Dec_data$SL_mm)
+min(Dec_data$SL_mm)
+
+max(Feb_data$SL_mm)
+min(Feb_data$SL_mm)
+
+max(March_data$SL_mm)
+min(March_data$SL_mm)
+
+max(June_data$SL_mm)
+min(June_data$SL_mm)
+
+```
+
+
 #Population Shell Length Distribution Graph for Winter
-In this chunk, I am creating a bar graph showing the shell lenght distribution for the owl limpets found in my plots in zone 3 for data collection in February 2024
+In this chunk, I am creating a bar graph showing the shell length distribution for the owl limpets found in my plots in zone 3 for data collection in February 2024
 ```{r, Population Shell Length Distribution Graph}
-feb_cnm_pop_density <- feb_cnm_shell_length %>% #calling csv with shell length data
+feb_cnm_pop_density <- Feb_data %>% #calling df with shell length data
   select(Limpet_No, SL_mm) %>% #selecting limpet number to count and shell length
   ggplot( aes(x=SL_mm)) + #Sl on x, I am not selecting y so R can use limpet count for density plot
   geom_bar(fill="blue",#color of bars
@@ -79,8 +103,8 @@ feb_cnm_pop_density <- feb_cnm_shell_length %>% #calling csv with shell length d
         axis.text.x = element_text(size = 9),
         axis.text.y = element_blank())+
   scale_x_continuous(breaks = c(10,20,30,40,50,60,70,80))+ #lines I want to show up on x axis
-  scale_y_continuous(limits = c(0,90))+ #lines I want to show up on y axis
-  geom_vline(xintercept = mean(feb_cnm_shell_length$SL_mm),
+  scale_y_continuous(limits = c(0,60))+ #lines I want to show up on y axis
+  geom_vline(xintercept = mean(Feb_data$SL_mm),
              colour="green")+ #draw line where average lies on density
   theme_bw()
  feb_cnm_pop_density
@@ -89,16 +113,16 @@ feb_cnm_pop_density <- feb_cnm_shell_length %>% #calling csv with shell length d
 #Size Distribution of Tagged Limpets
 In this chunk, I am creating a new data frame with tagged limpets ONLY
 ```{r, Size Distribution of Tagged Limpets}
-feb_tagged_limpets <- feb_cnm_shell_length %>% #named new data frame using shell length data
+feb_tagged_limpets <- Feb_data %>% #named new data frame using shell length data
   filter(Tag_ID != 0) #filtered out non-tagged limpets
 feb_tagged_limpets #calling data frame
 mean(feb_tagged_limpets$SL_mm)
 ```
 
 #Tagged Limpets Shell Length Distribution Graph
-This chunk gives population size distribution of tagged limpets in winter
+This chunk gives population size distribution of tagged limpets in February
 ```{r, #Tagged Limpets Shell Length Distribution Graph}
-feb_tagged_distribution <- feb_tagged_limpets %>% #calling data frame with tagged limpets only
+feb_tagged_distribution <- Feb_data %>% #calling data frame with tagged limpets only
   select(Limpet_No, SL_mm) %>% #selecting limpet number to count and shell length
   ggplot( aes(x=SL_mm)) + #Sl on x, I am not selecting y so R can use limpet count for density plot
   geom_bar(fill="red",#color of bars
@@ -113,7 +137,7 @@ feb_tagged_distribution <- feb_tagged_limpets %>% #calling data frame with tagge
         axis.title.x = element_text(size = 8),
         axis.text.x = element_text(size = 7),
         axis.text.y = element_text(size = 7))+
-  scale_y_continuous(breaks = c(0,2,4,6,8,10))+ #lines I want to show up on y axis
+  scale_y_continuous(limits = c(0,60))+ #lines I want to show up on y axis
   scale_x_continuous(breaks = c(10,20,30,40,50,60,70,80))+ #lines I want to show up on x axis
   geom_vline(xintercept = mean(feb_tagged_limpets$SL_mm),
              colour="green")#draw line where average lies on density
@@ -130,7 +154,7 @@ feb_tagged_limpets %>%
 #February Size Density Graph
 Population size density graph
 ```{r, February Size Density Graph}
-p <- feb_cnm_shell_length %>%
+p <- Feb_data %>%
   ggplot( aes(x=SL_mm)) +
     geom_density(fill = "#FF6666", alpha = 0.6)+
   labs(title = "February")+
@@ -142,7 +166,7 @@ p
 #February Density Graph
 Histogram of population size in February
 ```{r, February Density Graph}
-r <- feb_cnm_shell_length %>%
+r <- Feb_data %>%
   ggplot( aes(x=SL_mm)) +
     geom_histogram(binwidth = 3, fill = "#70070e", color= "black")+
   labs(title = "February")+
@@ -153,7 +177,7 @@ r
 #Septemeber Size Density Graph
 Density graph of population size in September
 ```{r, Septemeber size Density Graph}
-q <- fall_data %>%
+q <- Sep_data %>%
   ggplot( aes(x=SL_mm)) +
     geom_density(fill = "#52B4C9", alpha = 0.6)+
   labs(title = "September")+
@@ -165,7 +189,7 @@ q
 #Density of September
 Histogram of graph of population distribution in september
 ```{r, Density of September Graph}
-s <- fall_data %>%
+s <- Sep_data %>%
   ggplot( aes(x=SL_mm)) +
     geom_histogram(binwidth = 3, fill = "#bf630d", color= "black")+
   labs(title = "September")+
@@ -181,12 +205,12 @@ q+p+
 ```
 
 #Patchwork of Fall and Winter Density
-Histograms of Fall and winter
-```{r, Patwork of Fall and Winter Density}
+Histograms of September and February
+```{r, Patwork of Sep and Feb Density}
 s+r
 ```
 
-#Growth Rates
+#Growth Rates STOPPED HERE
 In this portion I will begin to visualize growth between the seasons
 
 #Population Average Growth rate of Tagged Limpets from September to February
