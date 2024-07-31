@@ -44,7 +44,7 @@ library(pairwiseAdonis)
 #Read in CSV
 In this chunk, I am reading in the csv's that are relevant to growth data ONLY
 ```{r, Read in CSV}
-feb_cnm_shell_length <- read_csv(here("Data","2024_02_CNM_OL_SL_Data.csv"))
+#feb_cnm_shell_length <- read_csv(here("Data","2024_02_CNM_OL_SL_Data.csv"))
 master_sl <- read_csv(here("Data","Master_CNM_OL_SL_Data.csv")) %>%
 mutate(sex=ifelse(SL_mm>= 50, "female", "male"))
 ```
@@ -81,6 +81,7 @@ ggplot(Density_Data, aes(x=Plot_Name,
 
 #ttest of SL winter and Fall
 ```{r, ttest of SL winter and Fall}
+#the manipulation and model below are for seasons Fall and Winter
 by_season <- master_sl %>%
   select(Season, SL_mm) %>% 
   group_by(Season) %>% 
@@ -93,5 +94,20 @@ season_ttest
 
 season_wilcoxtest <- wilcox.test(SL_mm~Season, data = by_season, paired=FALSE)
 season_wilcoxtest
+
+#the manipulation below and model below are for fall, winter, and spring
+three_season <- master_sl %>%
+  filter(Season!="Spring", #filtered out "spring' which is the re-tagging event in March
+         Date!="2023_12") %>% #filtered out December collection because we did not complete all transects during that fieltrip
+  select(Season, SL_mm) %>% 
+  group_by(Season) %>% 
+  mutate(sqrt_sl = sqrt(SL_mm))
+
+qqPlot(three_season$sqrt_sl)
+
+three_season_mod <- lm(sqrt_sl~Season, data=three_season)
+check_model(three_season_mod)
+anova(three_season_mod)
+summary(three_season_mod)
 
 ```
