@@ -99,7 +99,7 @@ Winter_pop_density <- Winter_data %>%
            colour="black",#color of bar outline
            alpha= 1,#transparency of bar
            width = 1) + #size of bars
-  labs(title = "Shell Length Distribution of Owl Limpets At Cabrillo National Monument in Winter 2024",
+  labs(title = "Shell Length Distribution in Winter 2024",
          x = "Shell Length (mm)",
        y = "Owl Limpet Count")+
   theme(axis.title.y = element_blank(),
@@ -122,7 +122,7 @@ sep_cnm_pop_density <- Fall_data %>% #calling df with shell length data
            colour="black",#color of bar outline
            alpha= 1,#transparency of bar
            binwidth = 1) + #size of bars
-  labs(title = "Shell Length Distribution of Owl Limpets At Cabrillo National Monument in Fall 2023",
+  labs(title = "Shell Length Distribution in Fall 2023",
        x = "Shell Length (mm)",
        y = "Owl Limpet Count")+
   theme(axis.title.y = element_blank(),
@@ -146,7 +146,7 @@ spring_pop_density <- Spring_data %>% #calling df with shell length data
            colour="black",#color of bar outline
            alpha= 1,#transparency of bar
            binwidth = 1) + #size of bars
-  labs(title = "Shell Length Distribution of Owl Limpets At Cabrillo National Monument in Spring 2024",
+  labs(title = "Shell Length Distribution in Spring 2024",
        x = "Shell Length (mm)",
        y = "Owl Limpet Count")+
   theme(axis.title.y = element_blank(),
@@ -375,7 +375,7 @@ all_seasons_density_plot <- ggplot(all_seasons_Density_Data,
                                        fill=Season))+
   geom_boxplot(show.legend = FALSE)+
   labs(x = "Season",
-       y ="Log Limpet Density(#/m²)")+
+       y ="Log Owl Limpet Density(#/m²)")+
   scale_x_discrete(labels=c("Fall","Spring","Winter"))+
   scale_color_brewer(palette = "Set2")+
   scale_fill_brewer(palette = "Set3")+
