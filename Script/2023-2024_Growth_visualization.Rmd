@@ -489,6 +489,8 @@ March_dens
 #March was a retagging event so the density will be significantly smaller as we only measured and recorded 50 or less tagged limpets. Cannot compare March to June
 ```
 
+
+######Junk under this line, but potentially useful#######
 #February Size Density Graph
 Population size density graph
 ```{r, February Size Density Graph}
@@ -512,7 +514,7 @@ r <- Feb_data %>%
 r
 ```
 
-######Junk under this line, but potentially useful#######
+
 #Septemeber Size Density Graph
 Density graph of population size in September
 ```{r, Septemeber size Density Graph}
