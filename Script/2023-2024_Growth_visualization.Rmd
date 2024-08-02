@@ -86,6 +86,9 @@ min(Spring_data$SL_mm)
 #max(June_data$SL_mm)
 #min(June_data$SL_mm)
 
+median(Winter_data$SL_mm)
+median(Spring_data$SL_mm)
+median(Fall_data$SL_mm)
 ```
 
 
