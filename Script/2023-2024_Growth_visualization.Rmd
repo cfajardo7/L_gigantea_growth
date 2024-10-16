@@ -38,7 +38,9 @@ library(lmerTest)
 library(pscl)
 library(ggridges)
 library(devtools)
-library(pairwiseAdonis)
+#library(pairwiseAdonis)
+library(FSA)
+library(see)
 ```
 
 #Read in CSV
@@ -53,7 +55,8 @@ mutate(sex=ifelse(SL_mm>= 50, "female", "male"))
 #Filtering Data
 Filtered data to respective month of collection
 ```{r, Simple Statistics}
-Winter_data <- filter(master_sl, Season == "Winter")
+Winter_data <- filter(master_sl, Season == "Winter",
+                      Date != "2023_12")
 Fall_data <- master_sl %>% 
   select(Season, Date, Plot_Name, SL_mm, Tag_ID, sex) %>% 
   filter(Season=="Fall")
@@ -64,7 +67,7 @@ March_data <- filter(master_sl, Date =="2024_03")
 
 #Simple Statistics
 In this chunk, I am looking a simple stats like mean, max, min, standard deviation, standard error, variance, etc
-```{r}
+```{r, Simp Statistics}
 Winter_SL_mean <- mean(Winter_data$SL_mm)
 Fall_SL_mean <- mean(Fall_data$SL_mm)
 Spring_SL_mean <- mean(Spring_data$SL_mm)
@@ -94,7 +97,7 @@ median(Fall_data$SL_mm)
 
 #Population Shell Length Distribution Graph for Winter
 In this chunk, I am creating a bar graph showing the shell length distribution for the owl limpets found in my plots in zone 3 for data collection in February 2024
-```{r, Population Shell Length Distribution Graph}
+```{r, Population Shell Length Distribution Graph for Winter}
 Winter_pop_density <- Winter_data %>%
   filter(Date == "2024_02") %>% #calling df with shell length data 
   ggplot( aes(x=SL_mm)) + #Sl on x, I am not selecting y so R can use limpet count for density plot
@@ -202,6 +205,9 @@ SL_dis_mod <- kruskal.test(SL_mm~Season, data=size_dist_all_seasons)
 print(SL_dis_mod)
 pairwise.wilcox.test(size_dist_all_seasons$SL_mm, size_dist_all_seasons$Season,
                  p.adjust.method = "BH")
+dunnTest(SL_mm~Season,
+         size_dist_all_seasons,
+         method="bonferroni")
 
 ```
 
@@ -270,7 +276,7 @@ fall_tagged_distribution
 ```
 
 #Size Distribution of Tagged Limpets In Spring (June)
-```{r, Size Distribution of Tagged Limpets In June}
+```{r, Size Distribution of Tagged Limpets In Spring (June)}
 Spring_tagged_limpets <- Spring_data %>% #named new data frame using shell length data
   filter(Tag_ID != 0) #filtered out non-tagged limpets
 Spring_tagged_limpets #calling data frame
@@ -455,7 +461,7 @@ summary(mod_density_winter_spring)
 ```
 
 #Population Average Growth rate of Tagged Limpets from March to June
-```{r, Growth rate of Tagged Limpets from February to June}
+```{r, Population Average Growth rate of Tagged Limpets from March to June}
 March_by_sex_data <- master_sl %>%
   filter(Tag_ID!="0",
          Season!= "Fall",
@@ -497,91 +503,91 @@ March_dens
 #February Size Density Graph
 Population size density graph
 ```{r, February Size Density Graph}
-p <- Feb_data %>%
-  ggplot( aes(x=SL_mm)) +
-    geom_density(fill = "#FF6666", alpha = 0.6)+
-  labs(title = "February")+
-    theme_ipsum()
+#p <- Feb_data %>%
+  #ggplot( aes(x=SL_mm)) +
+   # geom_density(fill = "#FF6666", alpha = 0.6)+
+  #labs(title = "February")+
+   # theme_ipsum()
 
-p
+#p
 ```
 
 #February Density Graph
 Histogram of population size in February
 ```{r, February Density Graph}
-r <- Feb_data %>%
-  ggplot( aes(x=SL_mm)) +
-    geom_histogram(binwidth = 3, fill = "#70070e", color= "black")+
-  labs(title = "February")+
+#r <- Feb_data %>%
+  #ggplot( aes(x=SL_mm)) +
+    #geom_histogram(binwidth = 3, fill = "#70070e", color= "black")+
+  #labs(title = "February")+
     theme_ipsum()
-r
+#r
 ```
 
 
 #Septemeber Size Density Graph
 Density graph of population size in September
 ```{r, Septemeber size Density Graph}
-q <- Sep_data %>%
-  ggplot( aes(x=SL_mm)) +
-    geom_density(fill = "#52B4C9", alpha = 0.6)+
-  labs(title = "September")+
+#q <- Sep_data %>%
+  #ggplot( aes(x=SL_mm)) +
+    #geom_density(fill = "#52B4C9", alpha = 0.6)+
+  #labs(title = "September")+
     theme_ipsum()
 
-q
+#q
 ```
 
 #Density of September
 Histogram of graph of population distribution in september
 ```{r, Density of September Graph}
-s <- Sep_data %>%
-  ggplot( aes(x=SL_mm)) +
-    geom_histogram(binwidth = 3, fill = "#bf630d", color= "black")+
-  labs(title = "September")+
-    theme_ipsum()
-s
+#s <- Sep_data %>%
+  #ggplot( aes(x=SL_mm)) +
+   # geom_histogram(binwidth = 3, fill = "#bf630d", color= "black")+
+  #labs(title = "September")+
+    #theme_ipsum()
+#s
 ```
 
 #Patchwork of September and February Shell Length
 Density graphs of both September and February
 ```{r, Patchwork of September and February Shell Length}
-q+p+
-  plot_annotation(title = 'Shell Lenght Density of Owl Limpets in September and February', theme = theme(plot.title = element_text(size = 12)))
+#q+p+
+ # plot_annotation(title = 'Shell Lenght Density of Owl Limpets in September and February', theme = theme(plot.title = element_text(size = 12)))
 ```
 
 #Patchwork of Fall and Winter Density
 Histograms of September and February
 ```{r, Patwork of Sep and Feb Density}
-s+r
+#s+r
 ```
 
 
 #Boxplot of Raw Density
 Boxplot of raw density owl limpet population in zone three by season
 ```{r}
-sep_feb_master <- filter(master_sl, Date != "2023_12")
+#sep_feb_master <- filter(master_sl, Date != "2023_12")
 
-raw_density <- sep_feb_master %>%
-  ggplot(aes(x = as.factor(Season), y = SL_mm, fill = Season))+
-  geom_boxplot()+
-  labs(title = "Raw Density",
-       fill = "Season",
-       x = "Season")+
-  theme(plot.title = element_text(size = 8),
-        axis.title.x = element_text(size = 7),
-        axis.text.x = element_text(size = 6))
-raw_density
+#raw_density <- sep_feb_master %>%
+ # ggplot(aes(x = as.factor(Season), y = SL_mm, fill = Season))+
+  #geom_boxplot()+
+  #labs(title = "Raw Density",
+   #    fill = "Season",
+    #   x = "Season")+
+  #theme(plot.title = element_text(size = 8),
+   #     axis.title.x = element_text(size = 7),
+    #    axis.text.x = element_text(size = 6))
+#raw_density
 ```
 
 #Population Density in Fall and Winter
 Density graph of owl limpet population per season overlapping each other
 ```{r, Population Density in Fall and Winter}
-m <- master_sl %>%
-  ggplot( aes(x=SL_mm)) +
-    geom_density(aes(fill = Season), alpha = 0.6)+
-  labs(title = "Population Density in Fall and Winter",
-       x = "Shell Length",
-       y = "Density")+
-    theme_ipsum()
+#m <- master_sl %>%
+ # ggplot( aes(x=SL_mm)) +
+  #  geom_density(aes(fill = Season), alpha = 0.6)+
+  #labs(title = "Population Density in Fall and Winter",
+   #    x = "Shell Length",
+    #   y = "Density")+
+    #theme_ipsum()
 
-m
+#m
 ```
