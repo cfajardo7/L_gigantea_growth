@@ -38,7 +38,7 @@ library(lmerTest)
 library(pscl)
 library(ggridges)
 library(devtools)
-library(pairwiseAdonis)
+#library(pairwiseAdonis)
 ```
 
 #Read in CSV
@@ -82,32 +82,32 @@ ggplot(Density_Data, aes(x=Plot_Name,
 #ttest of SL winter and Fall
 ```{r, ttest of SL winter and Fall}
 #the manipulation and model below are for seasons Fall and Winter
-by_season <- master_sl %>%
-  select(Season, SL_mm) %>% 
-  group_by(Season) %>% 
-  mutate(sqrt_sl = sqrt(SL_mm))
+#by_season <- master_sl %>%
+ # select(Season, SL_mm) %>% 
+  #group_by(Season) %>% 
+  #mutate(sqrt_sl = sqrt(SL_mm))
 
-qqPlot(by_season$sqrt_sl)
+#qqPlot(by_season$sqrt_sl)
 
-season_ttest <- t.test(log(SL_mm)~Season, data = by_season)
-season_ttest
+#season_ttest <- t.test(log(SL_mm)~Season, data = by_season)
+#season_ttest
 
-season_wilcoxtest <- wilcox.test(SL_mm~Season, data = by_season, paired=FALSE)
-season_wilcoxtest
+#season_wilcoxtest <- wilcox.test(SL_mm~Season, data = by_season, paired=FALSE)
+#season_wilcoxtest
 
 #the manipulation below and model below are for fall, winter, and spring
-three_season <- master_sl %>%
-  filter(Season!="Spring", #filtered out "spring' which is the re-tagging event in March
-         Date!="2023_12") %>% #filtered out December collection because we did not complete all transects during that fieltrip
-  select(Season, SL_mm) %>% 
-  group_by(Season) %>% 
-  mutate(sqrt_sl = sqrt(SL_mm))
+#three_season <- master_sl %>%
+  #filter(Season!="Spring", #filtered out "spring' which is the re-tagging event in March
+         #Date!="2023_12") %>% #filtered out December collection because we did not complete all transects during that fieltrip
+  #select(Season, SL_mm) %>% 
+  #group_by(Season) %>% 
+  #mutate(sqrt_sl = sqrt(SL_mm))
 
-qqPlot(three_season$sqrt_sl)
+#qqPlot(three_season$sqrt_sl)
 
-three_season_mod <- lm(sqrt_sl~Season, data=three_season)
-check_model(three_season_mod)
-anova(three_season_mod)
-summary(three_season_mod)
+#three_season_mod <- lm(sqrt_sl~Season, data=three_season)
+#check_model(three_season_mod)
+#anova(three_season_mod)
+#summary(three_season_mod)
 
 ```
