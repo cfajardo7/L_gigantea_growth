@@ -56,12 +56,18 @@ mutate(sex=ifelse(SL_mm>= 50, "female", "male"))
 Filtered data to respective month of collection
 ```{r, Simple Statistics}
 Winter_data <- filter(master_sl, Season == "Winter",
-                      Date != "2023_12")
+                      Date != "2023_12", 
+                      Plot_Name != "CNM_7") #Normalized to 6 full transects
 Fall_data <- master_sl %>% 
   select(Season, Date, Plot_Name, SL_mm, Tag_ID, sex) %>% 
-  filter(Season=="Fall")
-Spring_data <- filter(master_sl, Season == "Late_Spring")
-March_data <- filter(master_sl, Date =="2024_03")
+  filter(Season=="Fall",
+         Plot_Name != "CNM_7") #Normalized to 6 full transects
+Spring_data <- filter(master_sl, Season == "Late_Spring",
+                      Plot_Name != "CNM_7", #Normalized to 6 full transects
+                      Plot_Name != "CNM_8") #Normalized to 6 full transects
+March_data <- filter(master_sl, Date =="2024_03",
+                     Plot_Name != "CNM_7", #Normalized to 6 full transects
+                     Plot_Name != "CNM_8") #Normalized to 6 full transects
 #June_data <- filter(master_sl, Date == "2024_06")
 ```
 
@@ -99,7 +105,6 @@ median(Fall_data$SL_mm)
 In this chunk, I am creating a bar graph showing the shell length distribution for the owl limpets found in my plots in zone 3 for data collection in February 2024
 ```{r, Population Shell Length Distribution Graph for Winter}
 Winter_pop_density <- Winter_data %>%
-  filter(Date == "2024_02") %>% #calling df with shell length data 
   ggplot( aes(x=SL_mm)) + #Sl on x, I am not selecting y so R can use limpet count for density plot
   geom_bar(fill="blue",#color of bars
            colour="black",#color of bar outline
@@ -146,7 +151,6 @@ sep_cnm_pop_density <- Fall_data %>% #calling df with shell length data
 #Population Shell Length Distribution Graph for Spring
 ```{r, Population Shell Length Distribution Graph for Spring}
 spring_pop_density <- Spring_data %>% #calling df with shell length data
-  select(Limpet_No, SL_mm) %>% #selecting limpet number to count and shell length
   ggplot( aes(x=SL_mm)) + #Sl on x, I am not selecting y so R can use limpet count for density plot
   geom_histogram(fill="pink",#color of bars
            colour="black",#color of bar outline
@@ -171,8 +175,7 @@ spring_pop_density <- Spring_data %>% #calling df with shell length data
 In this chunk, I am creating a new data frame with tagged limpets ONLY
 ```{r, Size Distribution of Tagged Limpets in Winter}
 Winter_tagged_limpets <- Winter_data %>% #named new data frame using shell length data
-  filter(Date != "2023_12",
-         Tag_ID != 0) #filtered out non-tagged limpets
+  filter(Tag_ID != 0) #filtered out non-tagged limpets
 Winter_tagged_limpets #calling data frame
 mean(Winter_tagged_limpets$SL_mm)
 ```
@@ -183,7 +186,8 @@ mean(Winter_tagged_limpets$SL_mm)
 size_dist_all_seasons <-master_sl %>% 
   filter(Season!="Spring",
          Date!="2023_12",
-         Plot_Name!="CNM_8")
+         Plot_Name!="CNM_8",
+         Plot_Name != "CNM_7")
 
 all_seasons_dist_boxplot <- ggplot(size_dist_all_seasons,
                                    aes(x=Season,
@@ -208,6 +212,7 @@ pairwise.wilcox.test(size_dist_all_seasons$SL_mm, size_dist_all_seasons$Season,
 dunnTest(SL_mm~Season,
          size_dist_all_seasons,
          method="bonferroni")
+
 
 ```
 
