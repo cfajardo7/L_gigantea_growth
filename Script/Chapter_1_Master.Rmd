@@ -1,0 +1,143 @@
+---
+title: "Chapter_1_Master"
+author: "Cindy Fajardo"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.path = "../Output/")
+```
+
+#Welcome
+This Rmarkdown file will be used for the first chapter of my Master's thesis. You will find data manipulation, visualizations, and statistical analysis of data that I collected on the owl limpet population found in Cabrillo National Monument Zone 3 from September 2023- June 2024. The following ecological/biological concepts that are covered are
+
+- Seasonal Growth Rates
+
+- Seasonal Changes in Population Distribution
+
+- Seasonal Changes in Population Density
+
+- Seasonal changes in local community composition in presence/absence of central owl limpet
+
+Below you will find the data frames that I used. Enjoy!
+
+#Libraries
+But first, lets load the libraries I used/have stored here for easy convenience
+```{r, Libraries}
+library("rerddap")
+library(tidyverse)
+library("tidync")
+library("doParallel")
+library(lubridate)
+library(patchwork)
+library(viridis)
+library(here)
+library(kableExtra)
+library(hrbrthemes)
+library(emmeans)
+library(agricolae)
+library(vegan)
+library(performance)
+library(broom)
+library(car)
+library(lme4)
+library(lmerTest)
+library(pscl)
+library(ggridges)
+library(devtools)
+#library(pairwiseAdonis)
+library(FSA)
+library(see)
+```
+
+#Read in CSV
+In this chunk, I am reading in the csv's that are relevant to growth data ONLY
+```{r, Read in CSV}
+master_sl <- read_csv(here("Data","Master_CNM_OL_SL_Data.csv")) %>%
+  filter(Plot_Name != "CNM_7", #filtered out non-full transect
+         Plot_Name != "CNM_8") %>% #filtered out transects not found in all seasons
+mutate(sex=ifelse(SL_mm>= 50, "female", "male"))
+sess_percentcover <- read_csv(here("Data", "Master_CNM_Sessile_Percent_Data.csv"))
+mobiles_master <- read.csv(here("Data", "Master_CNM_Mobile_Data.csv"))
+mobiles_matrix_master <- read.csv(here("Data", "Master_CNM_Mobile_Matrix.csv"))
+sessile_matrix_master <- read.csv(here("Data", "Master_CNM_Sessile_Matrix.csv"))
+
+```
+
+#Seasonal Growth Rates
+I'll start off with seasonal growth rates. Unfortunately, I continuously got negative rates, meaning there was some type of human error when measuring limpets shell length. But for transparency reasons, I will still show the data and the code.
+
+#Population Average Growth rate of Tagged Limpets from September to February
+```{r, Growth rate of Tagged Limpets from September to February}
+by_sex_fall_win_data <- master_sl %>% #calling master shell length data
+  filter(Tag_ID!="0", #filtered out un-tagged limpets
+         Date != "2023_12", #filtered out December data, it wasn't complete
+         Date != "2024_03", #filtered out non-winter or non- fall data
+         Date != "2024-06") %>% #filtered out non-winter or non- fall data
+  group_by(sex, Tag_ID) %>% #grouped them by sex
+  reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Fall"])/4.75) %>% 
+  left_join(master_sl %>% 
+              filter(Tag_ID!="0",
+                     Season=="Fall") %>% 
+              select(Tag_ID,SL_mm))
+
+fall_win_growth_plot <- ggplot(by_sex_fall_win_data, aes(x=SL_mm,
+                        y = limpet_growth,
+                        color = sex))+
+         geom_boxplot()
+fall_win_growth_plot
+```
+
+#Population Average Growth rate of Tagged Limpets from February to June
+This does not include March re-tagging event. After I join the master back to the data frame, all of the males disapear. I'm not sure why.
+```{r, Population Average Growth rate of Tagged Limpets from February to June}
+Spring_by_sex_data <- master_sl %>%
+  filter(Tag_ID!="0",
+         Season!= "Spring",
+         Season != "Fall",
+         Date != "2023_12") %>% 
+  group_by(sex, Tag_ID) %>%
+  reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Late_Spring"])/4.75) %>% 
+  left_join(master_sl %>% 
+              filter(Tag_ID!="0",
+                     Season=="Late_Spring") %>% 
+              select(Tag_ID,SL_mm)) #most values are negative
+
+spring_by_sex_box <- ggplot(Spring_by_sex_data, aes(x=SL_mm,
+                        y = limpet_growth,
+                        color = sex))+
+         geom_boxplot()
+spring_by_sex_box
+
+#Density?
+Spring_Density_Data <- master_sl %>%
+  filter(Season != "Fall") %>% 
+  filter(Season != "Spring",
+         Date!="2023_12") %>% 
+   group_by(Season, Plot_Name)%>%
+   count()%>%
+   mutate(limpet_density_m2 = n/50)
+   
+winter_spring_dens_plot <- ggplot(Spring_Density_Data, 
+       aes(x=Plot_Name,
+           y=limpet_density_m2,
+           color=Season))+
+  geom_boxplot()+
+  scale_color_brewer(palette = "Set1")
+winter_spring_dens_plot
+
+ 
+ # run model for dependent variable ~ independent, then for normality, etc, interpret model
+mod_density_winter_spring <-lm(limpet_density_m2~Season, data = Spring_Density_Data)
+check_model(mod_density_winter_spring)
+anova(mod_density_winter_spring) 
+summary(mod_density_winter_spring)
+
+```
+
+#Seasonal Population Distribution
+In this section, I will start the seasonal population distribution
