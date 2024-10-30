@@ -97,7 +97,8 @@ fall_win_growth_plot <- ggplot(by_sex_fall_win_data, aes(x=SL_mm,
                         y = limpet_growth,
                         color = sex))+
          geom_boxplot()+
-  labs(x = "Shell Length",
+  labs(title = "Limpet Growth From September 2023-Februray 2024",
+       x = "Shell Length",
        y = "Limpet Growth")+
   theme_ipsum_pub()
 
@@ -122,7 +123,11 @@ Spring_by_sex_data <- master_sl %>%
 spring_by_sex_box <- ggplot(Spring_by_sex_data, aes(x=SL_mm,
                         y = limpet_growth,
                         color = sex))+
-         geom_boxplot()
+         geom_boxplot()+
+  labs(title = "Limpet Growth From February 2024-June 2024",
+       x = "Shell Length",
+       y = "Limpet Growth")+
+  theme_ipsum_pub()
 spring_by_sex_box
 ```
 
@@ -259,7 +264,7 @@ spring_pop_density <- Spring_data %>% #calling df with shell length data
  spring_pop_density
 ```
 
-#Analyis of Population Density Data of All Seasons
+#Analyis of Population Distribution Data of All Seasons
 ```{r, Analyis of Population Density Data of All Seasons}
 #Data Manipulation
 size_dist_all_seasons <-master_sl %>% 
@@ -296,3 +301,43 @@ dunnTest(SL_mm~Season,
 
 ```
 
+#Population Density
+In this section I will look at the population density throughout the seasons and their statistical analysis. 
+```{r, Population Density}
+all_seasons_Density_Data <- master_sl %>%
+   filter(Season!="Spring", #not including re-tagging event
+          Date!="2023_12")  %>% #not including December
+   group_by(Season, Plot_Name)%>%
+   count()%>%
+   mutate(limpet_density_m2 = n/20) %>% 
+  mutate(Plot = as.factor(Plot_Name)) %>% 
+  mutate(log_density = log(limpet_density_m2),
+         Seasons = as.factor(Season))
+
+all_seasons_density_plot <- ggplot(all_seasons_Density_Data,
+                                   aes(x=Season,
+                                       y=log_density,
+                                       color=Season,
+                                       fill=Season))+
+  geom_boxplot(show.legend = FALSE)+
+  labs(x = "Season",
+       y ="Log Owl Limpet Density")+
+  scale_x_discrete(labels=c("Fall","Spring","Winter"))+
+  scale_color_brewer(palette = "Set2")+
+  scale_fill_brewer(palette = "Set3")+
+  theme_bw()
+  
+all_seasons_density_plot  
+
+ # run model for dependent variable ~ independent, then for normality, etc, interpret model
+mod_density_all_seasons <-lmer(log_density~Seasons+(1|Plot), data = all_seasons_Density_Data)
+check_model(mod_density_all_seasons)
+anova(mod_density_all_seasons)
+summary(mod_density_all_seasons)
+
+#Post hoc tests
+emmeans(mod_density_all_seasons, list(pairwise~Seasons), adjust = "tukey")
+
+
+
+```
