@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE,
 ```
 
 #Welcome
-This Rmarkdown file will be used for the first chapter of my Master's thesis. You will find data manipulation, visualizations, and statistical analysis of data that I collected on the owl limpet population found in Cabrillo National Monument Zone 3 from September 2023- June 2024. The following ecological/biological concepts that are covered are
+This Rmarkdown file will be used for the first chapter of my Master's thesis. You will find data manipulation, visualizations, and statistical analysis of data that I collected on the owl limpet population found at Cabrillo National Monument Zone 3 from September 2023- June 2024. The following ecological/biological concepts that are covered are
 
 - Seasonal Growth Rates
 
@@ -55,16 +55,24 @@ library(see)
 ```
 
 #Read in CSV
-In this chunk, I am reading in the csv's that are relevant to growth data ONLY
+In this chunk, I am reading in the csv's that are relevant to growth and community survey data ONLY
 ```{r, Read in CSV}
 master_sl <- read_csv(here("Data","Master_CNM_OL_SL_Data.csv")) %>%
   filter(Plot_Name != "CNM_7", #filtered out non-full transect
          Plot_Name != "CNM_8") %>% #filtered out transects not found in all seasons
 mutate(sex=ifelse(SL_mm>= 50, "female", "male"))
-sess_percentcover <- read_csv(here("Data", "Master_CNM_Sessile_Percent_Data.csv"))
-mobiles_master <- read.csv(here("Data", "Master_CNM_Mobile_Data.csv"))
-mobiles_matrix_master <- read.csv(here("Data", "Master_CNM_Mobile_Matrix.csv"))
-sessile_matrix_master <- read.csv(here("Data", "Master_CNM_Sessile_Matrix.csv"))
+sess_percentcover <- read_csv(here("Data", "Master_CNM_Sessile_Percent_Data.csv")) %>%
+  filter(Transect != "CNM_7", #filtered out non-full transect
+         Transect != "CNM_8") #filtered out transects not found in all seasons
+mobiles_master <- read.csv(here("Data", "Master_CNM_Mobile_Data.csv")) %>%
+  filter(Transect != "CNM_7", #filtered out non-full transect
+         Transect != "CNM_8") #filtered out transects not found in all seasons
+mobiles_matrix_master <- read.csv(here("Data", "Master_CNM_Mobile_Matrix.csv")) %>%
+  filter(Transect != "CNM_7", #filtered out non-full transect
+         Transect != "CNM_8") #filtered out transects not found in all seasons
+sessile_matrix_master <- read.csv(here("Data", "Master_CNM_Sessile_Matrix.csv")) %>%
+  filter(Transect != "CNM_7", #filtered out non-full transect
+         Transect != "CNM_8") #filtered out transects not found in all seasons
 
 ```
 
@@ -88,7 +96,11 @@ by_sex_fall_win_data <- master_sl %>% #calling master shell length data
 fall_win_growth_plot <- ggplot(by_sex_fall_win_data, aes(x=SL_mm,
                         y = limpet_growth,
                         color = sex))+
-         geom_boxplot()
+         geom_boxplot()+
+  labs(x = "Shell Length",
+       y = "Limpet Growth")+
+  theme_ipsum_pub()
+
 fall_win_growth_plot
 ```
 
@@ -101,7 +113,7 @@ Spring_by_sex_data <- master_sl %>%
          Season != "Fall",
          Date != "2023_12") %>% 
   group_by(sex, Tag_ID) %>%
-  reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Late_Spring"])/4.75) %>% 
+  reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Late_Spring"])/4.75) %>% #In this line of code all of the males disappear. I think this is happening because the tagged male limpets that were found were the ones tagged in the retagging event in early spring but the data is not being used. Only female tagged limpets that had been tagged in the original tagging even in September were found.
   left_join(master_sl %>% 
               filter(Tag_ID!="0",
                      Season=="Late_Spring") %>% 
@@ -112,7 +124,10 @@ spring_by_sex_box <- ggplot(Spring_by_sex_data, aes(x=SL_mm,
                         color = sex))+
          geom_boxplot()
 spring_by_sex_box
+```
 
+I'm not sure what to do with this chunk of code, I copied it from 2023-2024 Growth visualization markdown. Will tackle later.
+```{r, Look at later}
 #Density?
 Spring_Density_Data <- master_sl %>%
   filter(Season != "Fall") %>% 
@@ -139,5 +154,145 @@ summary(mod_density_winter_spring)
 
 ```
 
+#Analysis of Growth Data
+
 #Seasonal Population Distribution
 In this section, I will start the seasonal population distribution
+
+#Fall Distribution
+```{r, Fall Distribution}
+Fall_data <- master_sl %>% 
+  select(Season, Date, Plot_Name, SL_mm, Tag_ID, sex) %>% 
+  filter(Season=="Fall")
+
+Fall_SL_mean <- mean(Fall_data$SL_mm)
+
+max(Fall_data$SL_mm)
+min(Fall_data$SL_mm)
+
+median(Fall_data$SL_mm)
+
+sep_cnm_pop_density <- Fall_data %>% #calling df with shell length data 
+  ggplot( aes(x=SL_mm)) + #Sl on x, I am not selecting y so R can use limpet count for density plot
+  geom_histogram(fill="purple",#color of bars
+           colour="black",#color of bar outline
+           alpha= 1,#transparency of bar
+           binwidth = 1) + #size of bars
+  labs(title = "Shell Length Distribution in Fall 2023",
+       x = "Shell Length (mm)",
+       y = "Owl Limpet Count")+
+  theme(axis.title.y = element_blank(),
+        axis.title.x = element_text(size = 10),
+        axis.text.x = element_text(size = 9),
+        axis.text.y = element_blank())+
+  scale_x_continuous(limits = c(0,90))+ #lines I want to show up on x axis
+  scale_y_continuous(limits = c(0,90))+ #lines I want to show up on y axis
+  geom_vline(xintercept = median(Fall_data$SL_mm),
+             colour="green")+ #draw line where average lies on density
+  theme_bw()
+ sep_cnm_pop_density
+
+```
+
+#Winter Distribution
+```{r, Winter Distribution}
+Winter_data <- filter(master_sl, Season == "Winter",
+                      Date != "2023_12")
+
+Winter_SL_mean <- mean(Winter_data$SL_mm)
+
+max(Winter_data$SL_mm)
+min(Winter_data$SL_mm)
+
+median(Winter_data$SL_mm)
+
+Winter_pop_density <- Winter_data %>%
+  ggplot( aes(x=SL_mm)) + #Sl on x, I am not selecting y so R can use limpet count for density plot
+  geom_bar(fill="blue",#color of bars
+           colour="black",#color of bar outline
+           alpha= 1,#transparency of bar
+           width = 1) + #size of bars
+  labs(title = "Shell Length Distribution in Winter 2024",
+         x = "Shell Length (mm)",
+       y = "Owl Limpet Count")+
+  theme(axis.title.y = element_blank(),
+        axis.title.x = element_text(size = 10),
+        axis.text.x = element_text(size = 9),
+        axis.text.y = element_blank())+
+  scale_x_continuous(limits = c(0,90))+ #lines I want to show up on x axis
+  scale_y_continuous(limits = c(0,90))+ #lines I want to show up on y axis
+  geom_vline(xintercept = median(Winter_data$SL_mm),
+             colour="green")+ #draw line where average lies on density
+  theme_bw()
+ Winter_pop_density
+```
+
+#Spring Distribution
+```{r, Spring Distribution}
+Spring_data <- filter(master_sl, Season == "Late_Spring")
+
+Spring_SL_mean <- mean(Spring_data$SL_mm)
+
+max(Spring_data$SL_mm)
+min(Spring_data$SL_mm)
+
+median(Spring_data$SL_mm)
+
+spring_pop_density <- Spring_data %>% #calling df with shell length data
+  ggplot( aes(x=SL_mm)) + #Sl on x, I am not selecting y so R can use limpet count for density plot
+  geom_histogram(fill="pink",#color of bars
+           colour="black",#color of bar outline
+           alpha= 1,#transparency of bar
+           binwidth = 1) + #size of bars
+  labs(title = "Shell Length Distribution in Spring 2024",
+       x = "Shell Length (mm)",
+       y = "Owl Limpet Count")+
+  theme(axis.title.y = element_blank(),
+        axis.title.x = element_text(size = 10),
+        axis.text.x = element_text(size = 9),
+        axis.text.y = element_blank())+
+  scale_x_continuous(limits = c(0,90))+
+  scale_y_continuous(limits = c(0,90))+
+  geom_vline(xintercept = median(Spring_data$SL_mm),
+             colour="green")+ #draw line where average lies on density
+  theme_bw()
+ spring_pop_density
+```
+
+#Analyis of Population Density Data of All Seasons
+```{r, Analyis of Population Density Data of All Seasons}
+#Data Manipulation
+size_dist_all_seasons <-master_sl %>% 
+  filter(Season!="Spring",
+         Date!="2023_12")
+
+all_seasons_dist_boxplot <- ggplot(size_dist_all_seasons,
+                                   aes(x=Season,
+                                       y=SL_mm,
+                                       color=Season,
+                                       fill=Season))+
+  geom_boxplot(show.legend = FALSE)+
+  labs(x = "Season",
+       y ="Shell Length")+
+  scale_y_continuous(breaks = c(20,30,40,50,60,70,80,90))+
+  scale_x_discrete(labels=c("Fall","Spring","Winter"))+
+  scale_color_brewer(palette = "Set2")+
+  scale_fill_brewer(palette = "Set3")+
+  theme_bw()
+all_seasons_dist_boxplot
+
+#models
+SL_dis_mod <- kruskal.test(SL_mm~Season, data=size_dist_all_seasons)
+#check_model(SL_dis_mod) #this disn't work, I got this error
+#Error: `check_model()` returned following error: Can't extract variance-covariance matrix. `get_varcov()` returned following
+  #error: no applicable method for 'vcov' applied to an object of class "htest"
+  #If the error message does not help identifying your problem, another reason why `check_model()` failed might be that
+  #models of class `htest` are not yet supported.
+pairwise.wilcox.test(size_dist_all_seasons$SL_mm, size_dist_all_seasons$Season,
+                 p.adjust.method = "BH")
+dunnTest(SL_mm~Season,
+         size_dist_all_seasons,
+         method="bonferroni")
+
+```
+
