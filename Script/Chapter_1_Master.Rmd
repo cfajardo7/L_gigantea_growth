@@ -54,25 +54,24 @@ library(FSA)
 library(see)
 ```
 
-#Read in CSV
+# Read in CSV
 In this chunk, I am reading in the csv's that are relevant to growth and community survey data ONLY
 ```{r, Read in CSV}
 master_sl <- read_csv(here("Data","Master_CNM_OL_SL_Data.csv")) %>%
-  filter(Plot_Name != "CNM_7", #filtered out non-full transect
-         Plot_Name != "CNM_8") %>% #filtered out transects not found in all seasons
+  filter(!Plot_Name %in% c("CNM_7", "CNM_8" )) %>% #filtered out transects not found in all seasons, do %in% to other lines
 mutate(sex=ifelse(SL_mm>= 50, "female", "male"))
+
 sess_percentcover <- read_csv(here("Data", "Master_CNM_Sessile_Percent_Data.csv")) %>%
-  filter(Transect != "CNM_7", #filtered out non-full transect
-         Transect != "CNM_8") #filtered out transects not found in all seasons
+  filter(!Transect%in% c("CNM_7", "CNM_8")) #filtered out transects not found in all seasons
+
 mobiles_master <- read.csv(here("Data", "Master_CNM_Mobile_Data.csv")) %>%
-  filter(Transect != "CNM_7", #filtered out non-full transect
-         Transect != "CNM_8") #filtered out transects not found in all seasons
+  filter(!Transect %in% c("CNM_7", "CNM_8")) #filtered out transects not found in all seasons
+
 mobiles_matrix_master <- read.csv(here("Data", "Master_CNM_Mobile_Matrix.csv")) %>%
-  filter(Transect != "CNM_7", #filtered out non-full transect
-         Transect != "CNM_8") #filtered out transects not found in all seasons
+  filter(!Transect %in% c("CNM_7", "CNM_8")) #filtered out transects not found in all seasons
+
 sessile_matrix_master <- read.csv(here("Data", "Master_CNM_Sessile_Matrix.csv")) %>%
-  filter(Transect != "CNM_7", #filtered out non-full transect
-         Transect != "CNM_8") #filtered out transects not found in all seasons
+  filter(!Transect %in% c("CNM_7", "CNM_8")) #filtered out transects not found in all seasons
 
 ```
 
@@ -83,20 +82,21 @@ I'll start off with seasonal growth rates. Unfortunately, I continuously got neg
 ```{r, Growth rate of Tagged Limpets from September to February}
 by_sex_fall_win_data <- master_sl %>% #calling master shell length data
   filter(Tag_ID!="0", #filtered out un-tagged limpets
-         Date != "2023_12", #filtered out December data, it wasn't complete
-         Date != "2024_03", #filtered out non-winter or non- fall data
-         Date != "2024-06") %>% #filtered out non-winter or non- fall data
+        Season %in% c("Winter", "Fall"),
+        Date != "2023_12_10") %>% #filtered out non-winter or non- fall data
+  mutate(Date = ymd(Date)) %>% #This will give me true date
   group_by(sex, Tag_ID) %>% #grouped them by sex
+  #reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Fall"])/(Date[Season == "Winter"]-Date[Season=="Fall"])*30) %>%  #this is to get true growth rate using dates calculated from lubridate then mulitplied by 30 to get growth per month
   reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Fall"])/4.75) %>% 
-  left_join(master_sl %>% 
+  left_join(master_sl %>% #this is to keep original lenght for fall
               filter(Tag_ID!="0",
                      Season=="Fall") %>% 
-              select(Tag_ID,SL_mm))
+              select(Tag_ID,SL_mm, Season))
 
 fall_win_growth_plot <- ggplot(by_sex_fall_win_data, aes(x=SL_mm,
                         y = limpet_growth,
                         color = sex))+
-         geom_boxplot()+
+         geom_point()+ #to have continuous x and continuous y
   labs(title = "Limpet Growth From September 2023-Februray 2024",
        x = "Shell Length",
        y = "Limpet Growth")+
@@ -110,26 +110,63 @@ This does not include March re-tagging event. After I join the master back to th
 ```{r, Population Average Growth rate of Tagged Limpets from February to June}
 Spring_by_sex_data <- master_sl %>%
   filter(Tag_ID!="0",
-         Season!= "Spring",
-         Season != "Fall",
-         Date != "2023_12") %>% 
+         Season %in% c("Late_Spring", "Winter"),
+         Date != "2023_12_10") %>% 
+  mutate(Date = ymd(Date)) %>% #This will give me true date
   group_by(sex, Tag_ID) %>%
+  #reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Fall"])/(Date[Season == "Winter"]-Date[Season=="Fall"])*30) %>%  #this is to get true growth rate using dates calculated from lubridate then mulitplied by 30 to get growth per month
   reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Late_Spring"])/4.75) %>% #In this line of code all of the males disappear. I think this is happening because the tagged male limpets that were found were the ones tagged in the retagging event in early spring but the data is not being used. Only female tagged limpets that had been tagged in the original tagging even in September were found.
   left_join(master_sl %>% 
               filter(Tag_ID!="0",
                      Season=="Late_Spring") %>% 
-              select(Tag_ID,SL_mm)) #most values are negative
+              select(Tag_ID,SL_mm, Season))#most values are negative
 
 spring_by_sex_box <- ggplot(Spring_by_sex_data, aes(x=SL_mm,
                         y = limpet_growth,
                         color = sex))+
-         geom_boxplot()+
+         geom_point()+
   labs(title = "Limpet Growth From February 2024-June 2024",
        x = "Shell Length",
        y = "Limpet Growth")+
   theme_ipsum_pub()
 spring_by_sex_box
 ```
+
+# Complete Growth Data
+```{r, Complete Growth Data}
+complete_growth <- bind_rows(by_sex_fall_win_data, Spring_by_sex_data)
+
+comp_growth_scatter <- complete_growth %>% 
+          filter(SL_mm > 50,
+                 SL_mm < 72) %>% 
+          ggplot(aes(x = SL_mm,
+                   y = limpet_growth))+
+  geom_point(aes(color = Season))+
+  geom_smooth(method = "lm",
+              formula = "y~poly(x,2)") #this adds a quadratic function
+
+comp_growth_scatter
+
+```
+
+# ANCOVA For Growth Data
+```{r}
+complete_growth %>% 
+          filter(SL_mm > 50)
+comp_growth_mod <- lmer(limpet_growth~poly(SL_mm,2)*Season+(1|Tag_ID), data = complete_growth %>% #want to keep this
+          filter(SL_mm > 50,
+                 SL_mm < 72))
+check_model(comp_growth_mod)
+anova(comp_growth_mod)
+summary(comp_growth_mod)
+
+lm_growth <- lm(limpet_growth~poly(SL_mm,2)*Season, data = complete_growth %>% 
+          filter(SL_mm > 50))
+check_model(lm_growth)
+anova(lm_growth)
+```
+
+
 
 I'm not sure what to do with this chunk of code, I copied it from 2023-2024 Growth visualization markdown. Will tackle later.
 ```{r, Look at later}
@@ -160,6 +197,7 @@ summary(mod_density_winter_spring)
 ```
 
 #Analysis of Growth Data
+
 
 #Seasonal Population Distribution
 In this section, I will start the seasonal population distribution
@@ -202,7 +240,7 @@ sep_cnm_pop_density <- Fall_data %>% #calling df with shell length data
 #Winter Distribution
 ```{r, Winter Distribution}
 Winter_data <- filter(master_sl, Season == "Winter",
-                      Date != "2023_12")
+                      Date != "2023_12_10")
 
 Winter_SL_mean <- mean(Winter_data$SL_mm)
 
@@ -269,7 +307,7 @@ spring_pop_density <- Spring_data %>% #calling df with shell length data
 #Data Manipulation
 size_dist_all_seasons <-master_sl %>% 
   filter(Season!="Spring",
-         Date!="2023_12")
+         Date!="2023_12_10")
 
 all_seasons_dist_boxplot <- ggplot(size_dist_all_seasons,
                                    aes(x=Season,
@@ -306,7 +344,7 @@ In this section I will look at the population density throughout the seasons and
 ```{r, Population Density}
 all_seasons_Density_Data <- master_sl %>%
    filter(Season!="Spring", #not including re-tagging event
-          Date!="2023_12")  %>% #not including December
+          Date!="2023_12_10")  %>% #not including December
    group_by(Season, Plot_Name)%>%
    count()%>%
    mutate(limpet_density_m2 = n/20) %>% 
