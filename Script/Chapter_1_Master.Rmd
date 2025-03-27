@@ -73,27 +73,29 @@ mobiles_matrix_master <- read.csv(here("Data", "Master_CNM_Mobile_Matrix.csv")) 
 sessile_matrix_master <- read.csv(here("Data", "Master_CNM_Sessile_Matrix.csv")) %>%
   filter(!Transect %in% c("CNM_7", "CNM_8")) #filtered out transects not found in all seasons
 
+cabrillo_yearly_lim_size <- read_csv(here("Data", "yearly_lim_size.csv")) 
+
 ```
 
-#Seasonal Growth Rates
+# Seasonal Growth Rates
 I'll start off with seasonal growth rates. Unfortunately, I continuously got negative rates, meaning there was some type of human error when measuring limpets shell length. But for transparency reasons, I will still show the data and the code.
 
-#Population Average Growth rate of Tagged Limpets from September to February
+# Population Average Growth rate of Tagged Limpets from September to February
 ```{r, Growth rate of Tagged Limpets from September to February}
-by_sex_fall_win_data <- master_sl %>% #calling master shell length data
-  filter(Tag_ID!="0", #filtered out un-tagged limpets
+fall_win_growth_data_sex <- master_sl %>% #calling master shell length data
+  filter(Tag_ID != "0", #filtered out un-tagged limpets
         Season %in% c("Winter", "Fall"),
         Date != "2023_12_10") %>% #filtered out non-winter or non- fall data
   mutate(Date = ymd(Date)) %>% #This will give me true date
   group_by(sex, Tag_ID) %>% #grouped them by sex
-  #reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Fall"])/(Date[Season == "Winter"]-Date[Season=="Fall"])*30) %>%  #this is to get true growth rate using dates calculated from lubridate then mulitplied by 30 to get growth per month
-  reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Fall"])/4.75) %>% 
-  left_join(master_sl %>% #this is to keep original lenght for fall
+  reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Fall"])/(as.numeric(Date[Season == "Winter"]-Date[Season=="Fall"]))*30) %>%  #this is to get true growth rate using dates calculated from lubridate then mulitplied by 30 to get growth per month
+  #reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Fall"])/4.75) %>% 
+  left_join(master_sl %>% #this is to keep original length for fall
               filter(Tag_ID!="0",
                      Season=="Fall") %>% 
               select(Tag_ID,SL_mm, Season))
 
-fall_win_growth_plot <- ggplot(by_sex_fall_win_data, aes(x=SL_mm,
+fall_win_growth_plot <- ggplot(fall_win_growth_data_sex, aes(x=SL_mm,
                         y = limpet_growth,
                         color = sex))+
          geom_point()+ #to have continuous x and continuous y
@@ -105,23 +107,23 @@ fall_win_growth_plot <- ggplot(by_sex_fall_win_data, aes(x=SL_mm,
 fall_win_growth_plot
 ```
 
-#Population Average Growth rate of Tagged Limpets from February to June
-This does not include March re-tagging event. After I join the master back to the data frame, all of the males disapear. I'm not sure why.
+# Population Average Growth rate of Tagged Limpets from February to June
+This does not include March re-tagging event. After I join the master back to the data frame, all of the males disappear. I'm not sure why.
 ```{r, Population Average Growth rate of Tagged Limpets from February to June}
-Spring_by_sex_data <- master_sl %>%
+win_spr_growth_data_sex <- master_sl %>%
   filter(Tag_ID!="0",
          Season %in% c("Late_Spring", "Winter"),
          Date != "2023_12_10") %>% 
   mutate(Date = ymd(Date)) %>% #This will give me true date
   group_by(sex, Tag_ID) %>%
-  #reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Fall"])/(Date[Season == "Winter"]-Date[Season=="Fall"])*30) %>%  #this is to get true growth rate using dates calculated from lubridate then mulitplied by 30 to get growth per month
-  reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Late_Spring"])/4.75) %>% #In this line of code all of the males disappear. I think this is happening because the tagged male limpets that were found were the ones tagged in the retagging event in early spring but the data is not being used. Only female tagged limpets that had been tagged in the original tagging even in September were found.
+  reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Late_Spring"])/(as.numeric(Date[Season == "Winter"]-Date[Season=="Late_Spring"]))*30) %>%  #this is to get true growth rate using dates calculated from lubridate then mulitplied by 30 to get growth per month
+  #reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Late_Spring"])/4.75) %>% #In this line of code all of the males disappear. I think this is happening because the tagged male limpets that were found were the ones tagged in the retagging event in early spring but the data is not being used. Only female tagged limpets that had been tagged in the original tagging even in September were found.
   left_join(master_sl %>% 
               filter(Tag_ID!="0",
                      Season=="Late_Spring") %>% 
-              select(Tag_ID,SL_mm, Season))#most values are negative
+              select(Tag_ID,SL_mm, Season)) #most values are negative
 
-spring_by_sex_box <- ggplot(Spring_by_sex_data, aes(x=SL_mm,
+win_spr_growth_plot <- ggplot(win_spr_growth_data_sex, aes(x=SL_mm,
                         y = limpet_growth,
                         color = sex))+
          geom_point()+
@@ -129,21 +131,23 @@ spring_by_sex_box <- ggplot(Spring_by_sex_data, aes(x=SL_mm,
        x = "Shell Length",
        y = "Limpet Growth")+
   theme_ipsum_pub()
-spring_by_sex_box
+win_spr_growth_plot
+#all of the males disappear from the data because the males that were tagged in the Fall may have dissapeared, the tag fell off, or they moved to a location out of the transect or view. I'm considering looking at the "spring" data which is the re-tagging event that happened in March 2024.
 ```
 
 # Complete Growth Data
 ```{r, Complete Growth Data}
-complete_growth <- bind_rows(by_sex_fall_win_data, Spring_by_sex_data)
+complete_growth <- bind_rows(fall_win_growth_data_sex, win_spr_growth_data_sex)
 
 comp_growth_scatter <- complete_growth %>% 
           filter(SL_mm > 50,
-                 SL_mm < 72) %>% 
+                 SL_mm < 72) %>%
+  mutate(growth_zero = ifelse(limpet_growth<0, 0, limpet_growth)) %>% 
           ggplot(aes(x = SL_mm,
-                   y = limpet_growth))+
+                   y = growth_zero))+
   geom_point(aes(color = Season))+
-  geom_smooth(method = "lm",
-              formula = "y~poly(x,2)") #this adds a quadratic function
+  geom_smooth(method = "glm", family = gaussian(link ="log")) #exponential decline
+              #formula = "y~I(log(x))") #this adds a quadratic function
 
 comp_growth_scatter
 
@@ -157,6 +161,7 @@ comp_growth_mod <- lmer(limpet_growth~poly(SL_mm,2)*Season+(1|Tag_ID), data = co
           filter(SL_mm > 50,
                  SL_mm < 72))
 check_model(comp_growth_mod)
+ggsave(here("Output", "Growth_Check_Model.png"))
 anova(comp_growth_mod)
 summary(comp_growth_mod)
 
@@ -168,13 +173,13 @@ anova(lm_growth)
 
 
 
-I'm not sure what to do with this chunk of code, I copied it from 2023-2024 Growth visualization markdown. Will tackle later.
+# Re-tagging event
+Here I am looking at data between the re-tagging event and the late spring data collection. I only did density this far that is why i am dividing n by 50 not twenty
 ```{r, Look at later}
 #Density?
 Spring_Density_Data <- master_sl %>%
-  filter(Season != "Fall") %>% 
-  filter(Season != "Spring",
-         Date!="2023_12") %>% 
+  filter(!Season %in% c("Winter", "Fall"),
+         Date!="2023_12_10") %>% 
    group_by(Season, Plot_Name)%>%
    count()%>%
    mutate(limpet_density_m2 = n/50)
@@ -183,7 +188,7 @@ winter_spring_dens_plot <- ggplot(Spring_Density_Data,
        aes(x=Plot_Name,
            y=limpet_density_m2,
            color=Season))+
-  geom_boxplot()+
+  geom_point()+
   scale_color_brewer(palette = "Set1")
 winter_spring_dens_plot
 
@@ -196,13 +201,10 @@ summary(mod_density_winter_spring)
 
 ```
 
-#Analysis of Growth Data
-
-
-#Seasonal Population Distribution
+# Seasonal Population Distribution
 In this section, I will start the seasonal population distribution
 
-#Fall Distribution
+# Fall Distribution
 ```{r, Fall Distribution}
 Fall_data <- master_sl %>% 
   select(Season, Date, Plot_Name, SL_mm, Tag_ID, sex) %>% 
@@ -219,8 +221,7 @@ sep_cnm_pop_density <- Fall_data %>% #calling df with shell length data
   ggplot( aes(x=SL_mm)) + #Sl on x, I am not selecting y so R can use limpet count for density plot
   geom_histogram(fill="purple",#color of bars
            colour="black",#color of bar outline
-           alpha= 1,#transparency of bar
-           binwidth = 1) + #size of bars
+           alpha= 1)+#transparency of bar
   labs(title = "Shell Length Distribution in Fall 2023",
        x = "Shell Length (mm)",
        y = "Owl Limpet Count")+
@@ -228,16 +229,19 @@ sep_cnm_pop_density <- Fall_data %>% #calling df with shell length data
         axis.title.x = element_text(size = 10),
         axis.text.x = element_text(size = 9),
         axis.text.y = element_blank())+
-  scale_x_continuous(limits = c(0,90))+ #lines I want to show up on x axis
-  scale_y_continuous(limits = c(0,90))+ #lines I want to show up on y axis
+  #scale_x_continuous(limits = c(0,90))+ #lines I want to show up on x axis
+  #scale_y_continuous(limits = c(0,90))+ #lines I want to show up on y axis
   geom_vline(xintercept = median(Fall_data$SL_mm),
              colour="green")+ #draw line where average lies on density
-  theme_bw()
+  theme_bw()+
+  facet_wrap(~Plot_Name)
  sep_cnm_pop_density
-
 ```
 
-#Winter Distribution
+
+
+# Winter Distribution
+When I attempt to use geom_bar with scale_x and scale_y continous, it ommits data at certain Shell lenghts 
 ```{r, Winter Distribution}
 Winter_data <- filter(master_sl, Season == "Winter",
                       Date != "2023_12_10")
@@ -251,10 +255,9 @@ median(Winter_data$SL_mm)
 
 Winter_pop_density <- Winter_data %>%
   ggplot( aes(x=SL_mm)) + #Sl on x, I am not selecting y so R can use limpet count for density plot
-  geom_bar(fill="blue",#color of bars
+  geom_histogram(fill="blue",#color of bars
            colour="black",#color of bar outline
-           alpha= 1,#transparency of bar
-           width = 1) + #size of bars
+           alpha= 1)+ #transparency of bar 
   labs(title = "Shell Length Distribution in Winter 2024",
          x = "Shell Length (mm)",
        y = "Owl Limpet Count")+
@@ -262,15 +265,17 @@ Winter_pop_density <- Winter_data %>%
         axis.title.x = element_text(size = 10),
         axis.text.x = element_text(size = 9),
         axis.text.y = element_blank())+
-  scale_x_continuous(limits = c(0,90))+ #lines I want to show up on x axis
-  scale_y_continuous(limits = c(0,90))+ #lines I want to show up on y axis
+  #scale_x_continuous(limits = c(0,90))+ #lines I want to show up on x axis
+  #scale_y_continuous(limits = c(0,90))+ #lines I want to show up on y axis
   geom_vline(xintercept = median(Winter_data$SL_mm),
              colour="green")+ #draw line where average lies on density
-  theme_bw()
+  theme_bw()+
+  facet_wrap(~Plot_Name)
+  
  Winter_pop_density
 ```
 
-#Spring Distribution
+# Spring Distribution
 ```{r, Spring Distribution}
 Spring_data <- filter(master_sl, Season == "Late_Spring")
 
@@ -294,15 +299,17 @@ spring_pop_density <- Spring_data %>% #calling df with shell length data
         axis.title.x = element_text(size = 10),
         axis.text.x = element_text(size = 9),
         axis.text.y = element_blank())+
-  scale_x_continuous(limits = c(0,90))+
-  scale_y_continuous(limits = c(0,90))+
+  #scale_x_continuous(limits = c(0,90))+
+  #scale_y_continuous(limits = c(0,90))+
   geom_vline(xintercept = median(Spring_data$SL_mm),
              colour="green")+ #draw line where average lies on density
-  theme_bw()
+  theme_bw()+
+  facet_wrap(~Plot_Name)
  spring_pop_density
 ```
 
-#Analyis of Population Distribution Data of All Seasons
+
+# Population Distribution Data of All Seasons
 ```{r, Analyis of Population Density Data of All Seasons}
 #Data Manipulation
 size_dist_all_seasons <-master_sl %>% 
@@ -312,18 +319,47 @@ size_dist_all_seasons <-master_sl %>%
 all_seasons_dist_boxplot <- ggplot(size_dist_all_seasons,
                                    aes(x=Season,
                                        y=SL_mm,
-                                       color=Season,
                                        fill=Season))+
-  geom_boxplot(show.legend = FALSE)+
+  geom_boxplot(width = 0.7,
+               show.legend = FALSE)+
+  geom_jitter(color = "black",
+              show_legend = FALSE,
+              width = 0.1)+
   labs(x = "Season",
        y ="Shell Length")+
   scale_y_continuous(breaks = c(20,30,40,50,60,70,80,90))+
   scale_x_discrete(labels=c("Fall","Spring","Winter"))+
-  scale_color_brewer(palette = "Set2")+
+  #scale_color_brewer(palette = "Set2")+
   scale_fill_brewer(palette = "Set3")+
   theme_bw()
 all_seasons_dist_boxplot
+```
 
+# Cabrillo Yearly Data
+```{r, Cabrillo Yearly Data}
+yearly_data <- cabrillo_yearly_lim_size %>% 
+  group_by(survey_year, season_name) %>% 
+  reframe(size=rep(size_class,n)) #%>% 
+  #filter(survey_year=="1990") this will filter per year to see if there is a dip like my data
+
+yearly_data %>% 
+  ggplot(aes(x = size))+
+  geom_histogram()+
+  facet_wrap(~survey_year)
+
+by_yearly_data <- cabrillo_yearly_lim_size %>% 
+  group_by(survey_year, season_name) %>% 
+  reframe(size=rep(size_class,n)) %>% 
+  filter(survey_year=="2021") #change this to match the year you are looking for
+
+by_yearly_data %>% 
+  ggplot(aes(x = size))+
+  geom_histogram()
+```
+
+
+# Analysis of Population Density of All Seasons
+```{r}
 #models
 SL_dis_mod <- kruskal.test(SL_mm~Season, data=size_dist_all_seasons)
 #check_model(SL_dis_mod) #this disn't work, I got this error
@@ -336,8 +372,8 @@ pairwise.wilcox.test(size_dist_all_seasons$SL_mm, size_dist_all_seasons$Season,
 dunnTest(SL_mm~Season,
          size_dist_all_seasons,
          method="bonferroni")
-
 ```
+
 
 #Population Density
 In this section I will look at the population density throughout the seasons and their statistical analysis. 
@@ -355,14 +391,12 @@ all_seasons_Density_Data <- master_sl %>%
 all_seasons_density_plot <- ggplot(all_seasons_Density_Data,
                                    aes(x=Season,
                                        y=log_density,
-                                       color=Season,
                                        fill=Season))+
   geom_boxplot(show.legend = FALSE)+
   labs(x = "Season",
        y ="Log Owl Limpet Density")+
   scale_x_discrete(labels=c("Fall","Spring","Winter"))+
-  scale_color_brewer(palette = "Set2")+
-  scale_fill_brewer(palette = "Set3")+
+  scale_fill_brewer(palette = "Dark2")+
   theme_bw()
   
 all_seasons_density_plot  

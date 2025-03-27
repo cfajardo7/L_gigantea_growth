@@ -195,6 +195,7 @@ all_seasons_dist_boxplot <- ggplot(size_dist_all_seasons,
                                        color=Season,
                                        fill=Season))+
   geom_boxplot(show.legend = FALSE)+
+  geom_scatter
   labs(x = "Season",
        y ="Shell Length")+
   scale_y_continuous(breaks = c(20,30,40,50,60,70,80,90))+
