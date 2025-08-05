@@ -355,6 +355,16 @@ by_yearly_data <- cabrillo_yearly_lim_size %>%
 by_yearly_data %>% 
   ggplot(aes(x = size))+
   geom_histogram()
+
+dip_yearly_data <- cabrillo_yearly_lim_size %>% 
+  group_by(survey_year, season_name) %>% 
+  reframe(size=rep(size_class,n)) %>% 
+  filter(survey_year %in% c("1990","1995","1996","2002","2006","2007","2016","2020","2021"))#change this to match the year you are looking for
+
+dip_yearly_data %>% 
+  ggplot(aes(x = size))+
+  geom_histogram()+
+  facet_wrap(~survey_year)
 ```
 
 
