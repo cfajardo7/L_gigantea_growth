@@ -429,24 +429,24 @@ emmeans(mod_density_all_seasons, list(pairwise~Seasons), adjust = "tukey")
 #lets start with manipulating mobile data. I need to make the mobile data sheet long and add another column specifying the functionality of the mobile organism (herbivore, carnivore)
 
 #long_mobiles <- mobiles_master %>% 
-  pivot_longer(cols = M_lugubris:L_gigantea,
-               names_to = "species",
-               values_to = "count") %>% 
-  mutate(species = as.factor(species)) %>% 
-  mutate(functionality = case_when(
-    species = "M_lugubris" ~ "predator",
-    species = "L_hartwegii" ~"grazer",
-    species = "L_dentiens" ~ "grazer",
-    species = "L_plena" ~ "grazer",
-    species = "L_keenae" ~ "grazer",
-    species = "L_limatula" ~ "grazer",
-    species = "L_scabra" ~ "grazer",
-    species = "Nuttallina_sp" ~"grazer",
-    species = "Mopalia_sp" ~ "grazer",
-    species = "P_crassipes" ~ "herbivore",
-    species = "T_eiseni" ~ "grazer",
-    species = "T_funebralis" ~ "grazer",
-    species = "T_gallina" ~ "grazer",
-    species = "L_gigantea" ~ "grazer"))
+ # pivot_longer(cols = M_lugubris:L_gigantea,
+  #             names_to = "species",
+   #            values_to = "count") %>% 
+  #mutate(species = as.factor(species)) %>% 
+  #mutate(functionality = case_when(
+   # species = "M_lugubris" ~ "predator",
+    #species = "L_hartwegii" ~"grazer",
+    #species = "L_dentiens" ~ "grazer",
+    #species = "L_plena" ~ "grazer",
+    #species = "L_keenae" ~ "grazer",
+    #species = "L_limatula" ~ "grazer",
+    #species = "L_scabra" ~ "grazer",
+    #species = "Nuttallina_sp" ~"grazer",
+    #species = "Mopalia_sp" ~ "grazer",
+    #species = "P_crassipes" ~ "herbivore",
+    #species = "T_eiseni" ~ "grazer",
+    #species = "T_funebralis" ~ "grazer",
+    #species = "T_gallina" ~ "grazer",
+    #species = "L_gigantea" ~ "grazer"))
 ```
 
