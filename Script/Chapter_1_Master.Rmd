@@ -335,37 +335,6 @@ all_seasons_dist_boxplot <- ggplot(size_dist_all_seasons,
 all_seasons_dist_boxplot
 ```
 
-# Cabrillo Yearly Data
-```{r, Cabrillo Yearly Data}
-CNM_ZThree__yearly_data <- cabrillo_yearly_lim_size %>%
-  filter(zone=="Zone III") %>%
-  group_by(survey_year, season_name) %>% 
-  reframe(size=rep(size_class,n)) #%>% 
-  #filter(survey_year=="1990") this will filter per year to see if there is a dip like my data
-
-CNM_ZThree__yearly_data %>% 
-  ggplot(aes(x = size))+
-  geom_histogram()+
-  facet_wrap(~survey_year)
-
-#Use this to look at Cabrillo Data Per Year 
-CNM_ZThree_per_year_data <- CNM_ZThree__yearly_data%>%
-  filter(survey_year=="2021") #change this to match the year you are looking for
-
-CNM_ZThree_per_year_data %>% 
-  ggplot(aes(x = size))+
-  geom_histogram()
-
-dip_CNM_ZThree_per_year_data <- CNM_ZThree__yearly_data %>% 
-  filter(survey_year %in% c("1991","1995","1996","1997","1998","2002","2003","2005","2006","2007","2008","2009","2010","2011","2013","2015","2016","2020","2021"))#change this to match the year you are looking for
-
-dip_CNM_ZThree_per_year_data %>% 
-  ggplot(aes(x = size))+
-  geom_histogram()+
-  facet_wrap(~survey_year)
-```
-
-
 # Analysis of Population Density of All Seasons
 ```{r}
 #models
@@ -422,29 +391,69 @@ emmeans(mod_density_all_seasons, list(pairwise~Seasons), adjust = "tukey")
 
 ```
 
+# Cabrillo Yearly Data
+This Data came from Lauren Pandori. This data in the owl limpet size recorded in all zones from 1990-2021. In this manipulation, I filtered for only Zone III data since I worked in Zone III. I am attempting to see if the there is a dip in the count data at a specific size frame that matches or closely matches my data to see if there is a pattern in size distribution. 
+```{r, Cabrillo Yearly Data}
+CNM_ZThree__yearly_data <- cabrillo_yearly_lim_size %>%
+  filter(zone=="Zone III") %>%
+  group_by(survey_year, season_name) %>% 
+  reframe(size=rep(size_class,n)) #%>% 
+  #filter(survey_year=="1990") this will filter per year to see if there is a dip like my data
+
+CNM_ZThree__yearly_data %>% 
+  ggplot(aes(x = size))+
+  geom_histogram()+
+  facet_wrap(~survey_year)
+
+#Use this to look at Cabrillo Data Per Year 
+CNM_ZThree_per_year_data <- CNM_ZThree__yearly_data%>%
+  filter(survey_year=="2021") #change this to match the year you are looking for
+
+CNM_ZThree_per_year_data %>% 
+  ggplot(aes(x = size))+
+  geom_histogram()
+
+dip_CNM_ZThree_per_year_data <- CNM_ZThree__yearly_data %>% 
+  filter(survey_year %in% c("1991","1995","1996","1997","1998","2002","2003","2005","2006","2007","2008","2009","2010","2011","2013","2015","2016","2020","2021"))#change this to match the year you are looking for
+
+dip_CNM_ZThree_per_year_data %>% 
+  ggplot(aes(x = size))+
+  geom_histogram()+
+  facet_wrap(~survey_year)
+```
+
 # Community Survey Data Manipulation
 ```{r, Mobile Data Manipulation}
 #lets start with manipulating mobile data. I need to make the mobile data sheet long and add another column specifying the functionality of the mobile organism (herbivore, carnivore)
 
-#long_mobiles <- mobiles_master %>% 
- # pivot_longer(cols = M_lugubris:L_gigantea,
-  #             names_to = "species",
-   #            values_to = "count") %>% 
-  #mutate(species = as.factor(species)) %>% 
+long_mobiles <- mobiles_master %>% 
+  pivot_longer(cols = M_lugubris:L_gigantea,
+               names_to = "species",
+               values_to = "count") %>% 
+  mutate(species = as.factor(species)) #%>% 
   #mutate(functionality = case_when(
-   # species = "M_lugubris" ~ "predator",
-    #species = "L_hartwegii" ~"grazer",
-    #species = "L_dentiens" ~ "grazer",
-    #species = "L_plena" ~ "grazer",
-    #species = "L_keenae" ~ "grazer",
-    #species = "L_limatula" ~ "grazer",
-    #species = "L_scabra" ~ "grazer",
-    #species = "Nuttallina_sp" ~"grazer",
-    #species = "Mopalia_sp" ~ "grazer",
-    #species = "P_crassipes" ~ "herbivore",
-    #species = "T_eiseni" ~ "grazer",
-    #species = "T_funebralis" ~ "grazer",
-    #species = "T_gallina" ~ "grazer",
-    #species = "L_gigantea" ~ "grazer"))
+  #species = "M_lugubris" ~ "predator",
+  #species = "L_hartwegii" ~"grazer",
+  #species = "L_dentiens" ~ "grazer",
+  #species = "L_plena" ~ "grazer",
+  #species = "L_keenae" ~ "grazer",
+  #species = "L_limatula" ~ "grazer",
+  #species = "L_scabra" ~ "grazer",
+  #species = "Nuttallina_sp" ~"grazer",
+  #species = "Mopalia_sp" ~ "grazer",
+  #species = "P_crassipes" ~ "herbivore",
+  #species = "T_eiseni" ~ "grazer",
+  #species = "T_funebralis" ~ "grazer",
+  #species = "T_gallina" ~ "grazer",
+  #species = "L_gigantea" ~ "grazer"))
+
+#I keepgetting this error message when I attempt to add a column with the function of the species to the data frame
+#Error in `mutate()`:
+#ℹ In argument: `functionality = case_when(...)`.
+#Caused by error in `case_when()`:
+#! `..1 (left)` must be a logical vector, not the string "M_lugubris".
+#Backtrace:
+#1. ... %>% ...
+#9. dplyr::case_when(...)
 ```
 
