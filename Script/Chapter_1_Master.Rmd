@@ -348,16 +348,16 @@ CNM_ZThree__yearly_data %>%
   geom_histogram()+
   facet_wrap(~survey_year)
 
-#Use thi to look at Cabrillo Data Per Year 
+#Use this to look at Cabrillo Data Per Year 
 CNM_ZThree_per_year_data <- CNM_ZThree__yearly_data%>%
-  filter(survey_year=="1990") #change this to match the year you are looking for
+  filter(survey_year=="2021") #change this to match the year you are looking for
 
 CNM_ZThree_per_year_data %>% 
   ggplot(aes(x = size))+
   geom_histogram()
 
 dip_CNM_ZThree_per_year_data <- CNM_ZThree__yearly_data %>% 
-  filter(survey_year %in% c("1990","1995","1996","2002","2006","2007","2016","2020","2021"))#change this to match the year you are looking for
+  filter(survey_year %in% c("1991","1995","1996","1997","1998","2002","2003","2005","2006","2007","2008","2009","2010","2011","2013","2015","2016","2020","2021"))#change this to match the year you are looking for
 
 dip_CNM_ZThree_per_year_data %>% 
   ggplot(aes(x = size))+
