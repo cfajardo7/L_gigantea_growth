@@ -75,6 +75,8 @@ sessile_matrix_master <- read.csv(here("Data", "Master_CNM_Sessile_Matrix.csv"))
 
 cabrillo_yearly_lim_size <- read_csv(here("Data", "yearly_lim_size.csv")) 
 
+master_temperature_data <- read.csv(here("Data", "Logger_CNM_2_2023_10_01__2024_06_10.csv"))
+
 ```
 
 # Seasonal Growth Rates
