@@ -311,7 +311,7 @@ spring_pop_density <- Spring_data %>% #calling df with shell length data
 ```
 
 
-# Population Distribution Data of All Seasons
+# Population Shell Length Distribution Data of All Seasons
 ```{r, Analyis of Population Density Data of All Seasons}
 #Data Manipulation
 size_dist_all_seasons <-master_sl %>% 
@@ -432,30 +432,23 @@ long_mobiles <- mobiles_master %>%
   pivot_longer(cols = M_lugubris:L_gigantea,
                names_to = "species",
                values_to = "count") %>% 
-  mutate(species = as.factor(species)) #%>% 
-  #mutate(functionality = case_when(
-  #species = "M_lugubris" ~ "predator",
-  #species = "L_hartwegii" ~"grazer",
-  #species = "L_dentiens" ~ "grazer",
-  #species = "L_plena" ~ "grazer",
-  #species = "L_keenae" ~ "grazer",
-  #species = "L_limatula" ~ "grazer",
-  #species = "L_scabra" ~ "grazer",
-  #species = "Nuttallina_sp" ~"grazer",
-  #species = "Mopalia_sp" ~ "grazer",
-  #species = "P_crassipes" ~ "herbivore",
-  #species = "T_eiseni" ~ "grazer",
-  #species = "T_funebralis" ~ "grazer",
-  #species = "T_gallina" ~ "grazer",
-  #species = "L_gigantea" ~ "grazer"))
+  mutate(species = as.factor(species)) %>% 
+  mutate(functionality = case_when(
+  species %in% "M_lugubris" ~ "predator",
+  species %in% "L_hartwegii" ~ "grazer",
+  species %in%  "L_dentiens" ~ "grazer",
+  species %in%  "L_plena" ~ "grazer",
+  species %in%  "L_keenae" ~ "grazer",
+  species %in%  "L_limatula" ~ "grazer",
+  species %in%  "L_scabra" ~ "grazer",
+  species %in%  "Nuttallina_sp" ~ "grazer",
+  species %in%  "Mopalia_sp" ~ "grazer",
+  species %in%  "P_crassipes" ~ "herbivore",
+  species %in%  "T_eiseni" ~ "grazer",
+  species %in%  "T_funebralis" ~ "grazer",
+  species %in%  "T_gallina" ~ "grazer",
+  species %in%  "L_gigantea" ~ "grazer"))
 
-#I keepgetting this error message when I attempt to add a column with the function of the species to the data frame
-#Error in `mutate()`:
-#ℹ In argument: `functionality = case_when(...)`.
-#Caused by error in `case_when()`:
-#! `..1 (left)` must be a logical vector, not the string "M_lugubris".
-#Backtrace:
-#1. ... %>% ...
-#9. dplyr::case_when(...)
+
 ```
 
