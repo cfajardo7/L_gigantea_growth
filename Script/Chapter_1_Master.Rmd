@@ -318,49 +318,92 @@ size_dist_all_seasons <-master_sl %>%
   filter(Season!="Spring",
          Date!="2023_12_10")
 
-all_seasons_dist_boxplot <- ggplot(size_dist_all_seasons,
+all_seasons_sl_boxplot <- ggplot(size_dist_all_seasons,
                                    aes(x=Season,
                                        y=SL_mm,
                                        fill=Season))+
   geom_boxplot(width = 0.7,
                show.legend = FALSE)+
-  geom_jitter(color = "black",
-              show_legend = FALSE,
-              width = 0.1)+
   labs(x = "Season",
        y ="Shell Length")+
   scale_y_continuous(breaks = c(20,30,40,50,60,70,80,90))+
-  scale_x_discrete(labels=c("Fall","Spring","Winter"))+
+  scale_x_discrete(labels=c("Fall","Winter","Spring"))+
   #scale_color_brewer(palette = "Set2")+
   scale_fill_brewer(palette = "Set3")+
   theme_bw()
-all_seasons_dist_boxplot
+all_seasons_sl_boxplot
 ```
 
-# Analysis of Population Density of All Seasons
+# Analysis of Shell Length Distribution For all seasons
+Here I begin the analysis of the shell length distribution to see if they're significantly different between seasons.
 ```{r}
 #models
 SL_dis_mod <- kruskal.test(SL_mm~Season, data=size_dist_all_seasons)
-#check_model(SL_dis_mod) #this disn't work, I got this error
+check_model(SL_dis_mod) #this disn't work, I got this error
 #Error: `check_model()` returned following error: Can't extract variance-covariance matrix. `get_varcov()` returned following
   #error: no applicable method for 'vcov' applied to an object of class "htest"
   #If the error message does not help identifying your problem, another reason why `check_model()` failed might be that
   #models of class `htest` are not yet supported.
+
+
+shapiro.test(size_dist_all_seasons$SL_mm)
 pairwise.wilcox.test(size_dist_all_seasons$SL_mm, size_dist_all_seasons$Season,
                  p.adjust.method = "BH")
 dunnTest(SL_mm~Season,
          size_dist_all_seasons,
          method="bonferroni")
+
+log_size_dist_all_seasons <-master_sl %>% 
+  filter(Season!="Spring",
+         Date!="2023_12_10") %>% 
+  mutate(log_sl= log(SL_mm),
+         sqr_sl= sqrt(SL_mm))
+
+qqnorm(log_size_dist_all_seasons$sqr_sl)
+
+#lmer
+sl_lmer<-lmer(SL_mm~Season+(1|Plot_Name), data = size_dist_all_seasons)
+check_model(sl_lmer)
+
+#glm
+sl_glm<-glm(SL_mm~Season, data = size_dist_all_seasons, 
+             family = Gamma(link="log"))
+check_model(sl_glm)
+anova(sl_glm)
+summary(sl_glm)
+
+#Post hoc tests
+emmeans(sl_glm, list(pairwise~Season), adjust = "tukey")
+
+#glmm
+sl_glmer<-glmer(SL_mm~Season+(1|Plot_Name), data = size_dist_all_seasons, 
+             family = Gamma(link="log"))
+check_model(sl_glmer)
+anova(sl_glm)
+summary(sl_glm)
+
+#Post hoc tests
+emmeans(sl_glmer, list(pairwise~Season), adjust = "tukey")
+
+
+#####################
+scatter_full <- ggplot(size_dist_all_seasons,
+                       aes(x=Season,
+                           y=SL_mm))+
+  geom_point()+
+  geom_smooth(method="lm")+
+  facet_wrap(~Season)#regression line, add method = lm 
+scatter_full
 ```
 
 
-#Population Density
+# Population Density
 In this section I will look at the population density throughout the seasons and their statistical analysis. 
 ```{r, Population Density}
 all_seasons_Density_Data <- master_sl %>%
    filter(Season!="Spring", #not including re-tagging event
           Date!="2023_12_10")  %>% #not including December
-   group_by(Season, Plot_Name)%>%
+   group_by(Season, Plot_Name) %>% 
    count()%>%
    mutate(limpet_density_m2 = n/20) %>% 
   mutate(Plot = as.factor(Plot_Name)) %>% 
@@ -374,14 +417,18 @@ all_seasons_density_plot <- ggplot(all_seasons_Density_Data,
   geom_boxplot(show.legend = FALSE)+
   labs(x = "Season",
        y ="Log Owl Limpet Density")+
-  scale_x_discrete(labels=c("Fall","Spring","Winter"))+
+  scale_x_discrete(labels=c("Fall","Winter","Spring"))+
   scale_fill_brewer(palette = "Dark2")+
   theme_bw()
   
 all_seasons_density_plot  
+```
 
- # run model for dependent variable ~ independent, then for normality, etc, interpret model
-mod_density_all_seasons <-lmer(log_density~Seasons+(1|Plot), data = all_seasons_Density_Data)
+# Linear mixed effects model for population density
+```{r, Linear mixed effects model for population density}
+
+# run model for dependent variable ~ independent, then for normality, etc, interpret model
+mod_density_all_seasons <-lmer(log_density~Season+(1|Plot), data = all_seasons_Density_Data)
 check_model(mod_density_all_seasons)
 anova(mod_density_all_seasons)
 summary(mod_density_all_seasons)
@@ -390,8 +437,94 @@ summary(mod_density_all_seasons)
 emmeans(mod_density_all_seasons, list(pairwise~Seasons), adjust = "tukey")
 
 
+#i'm going to stick to the generalized mixed effects model because the data is not normally distributed.
+#glmm
+density_glmm <- glmer(limpet_density_m2 ~ Season + (1 |Plot), 
+                    data = all_seasons_Density_Data, 
+                    family = Gamma(link = "log"))
+check_model(density_glmm)
+anova(density_glmm)
+summary(density_glmm)
+
+#Post hoc tests
+emmeans(density_glmm, list(pairwise~Season), adjust = "tukey")
+
+
 
 ```
+
+# Linear models for Owl limpets Abundance per season
+```{r, Linear models for Owl limpets Abundance per season}
+
+linear_abundance <-master_sl %>%
+   filter(Season!="Spring", #not including re-tagging event
+          Date!="2023_12_10")  %>% #not including December
+   group_by(Season, Plot_Name) %>% 
+   count() 
+
+shapiro.test(linear_abundance$abun)
+
+#mixed effects linear regressions
+mod_abundance_all_seasons <-lmer(n~Season+(1|Plot_Name), data = linear_abundance)
+check_model(mod_abundance_all_seasons)
+anova(mod_abundance_all_seasons)
+summary(mod_abundance_all_seasons)
+
+#Post hoc tests
+emmeans(mod_abundance_all_seasons, list(pairwise~Season), adjust = "tukey")
+
+#glm
+abundance_all_seasons <-glm(n~Season, data = linear_abundance,family = poisson(link = "log"))
+check_model(abundance_all_seasons)
+anova(mod_abundance_all_seasons)
+summary(mod_abundance_all_seasons)
+
+#Post hoc test
+emmeans(abundance_all_seasons, list(pairwise~Season), adjust = "tukey")
+
+#glmm
+abun_per_seas_tran <-glmer(n~Season+(1|Plot_Name), data = linear_abundance,family = poisson(link = "log"))
+check_model(abun_per_seas_tran)
+anova(abun_per_seas_tran)
+summary(mod_abundance_all_seasons)
+
+#Post hoc test
+emmeans(abun_per_seas_tran, list(pairwise~Season), adjust = "tukey")
+
+```
+
+
+# MANOVA or perMANOVA of Seasons x Shell Length, Density, Abundance
+```{r, MANOVA}
+
+average_data <-master_sl %>% 
+  filter(Season!="Spring",
+         Date!="2023_12_10") %>% 
+  group_by(Season, Plot_Name)
+
+manova_data <-master_sl %>%
+   filter(Season!="Spring", #not including re-tagging event
+          Date!="2023_12_10")  %>% #not including December
+   group_by(Season, Plot_Name) %>% 
+   count()%>%
+   mutate(limpet_density_m2 = n/20) %>% 
+  mutate(Plot = as.factor(Plot_Name)) %>% 
+  mutate(log_density = log(limpet_density_m2)) %>% 
+  ungroup() %>% 
+  group_by(Season) %>% 
+  mutate(abun = sum(n)) %>% 
+  ungroup() %>% 
+  group_by(Season, Plot_Name) %>% 
+  mutate(SL_avg = mean(average_data$SL_mm))
+  
+  
+  left_join(size_dist_all_seasons, by="Plot_Name") %>% 
+  group_by(Season.x, Plot) %>% 
+  mutate(SL_avg = mean(SL_mm))
+
+
+```
+
 
 # Cabrillo Yearly Data
 This Data came from Lauren Pandori. This data in the owl limpet size recorded in all zones from 1990-2021. In this manipulation, I filtered for only Zone III data since I worked in Zone III. I am attempting to see if the there is a dip in the count data at a specific size frame that matches or closely matches my data to see if there is a pattern in size distribution. 
@@ -435,19 +568,19 @@ long_mobiles <- mobiles_master %>%
   mutate(species = as.factor(species)) %>% 
   mutate(functionality = case_when(
   species %in% "M_lugubris" ~ "predator",
-  species %in% "L_hartwegii" ~ "grazer",
-  species %in%  "L_dentiens" ~ "grazer",
-  species %in%  "L_plena" ~ "grazer",
-  species %in%  "L_keenae" ~ "grazer",
-  species %in%  "L_limatula" ~ "grazer",
-  species %in%  "L_scabra" ~ "grazer",
-  species %in%  "Nuttallina_sp" ~ "grazer",
-  species %in%  "Mopalia_sp" ~ "grazer",
-  species %in%  "P_crassipes" ~ "herbivore",
-  species %in%  "T_eiseni" ~ "grazer",
-  species %in%  "T_funebralis" ~ "grazer",
-  species %in%  "T_gallina" ~ "grazer",
-  species %in%  "L_gigantea" ~ "grazer"))
+  species %in% "L_hartwegii" ~ "macrograzer",
+  species %in%  "L_dentiens" ~ "macrograzer",
+  species %in%  "L_plena" ~ "mesograzer",
+  species %in%  "L_keenae" ~ "mesograzer",
+  species %in%  "L_limatula" ~ "macrograzer",
+  species %in%  "L_scabra" ~ "macrograzer",
+  species %in%  "Nuttallina_sp" ~ "macrograzer",
+  species %in%  "Mopalia_sp" ~ "mesograzer",
+  species %in%  "P_crassipes" ~ "omnivore",
+  species %in%  "T_eiseni" ~ "mesograzer",
+  species %in%  "T_funebralis" ~ "mesograzer",
+  species %in%  "T_gallina" ~ "mesograzer",
+  species %in%  "L_gigantea" ~ "mesograzer"))
 
 
 ```
