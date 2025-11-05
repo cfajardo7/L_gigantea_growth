@@ -293,7 +293,7 @@ spring_pop_density <- Spring_data %>% #calling df with shell length data
   geom_histogram(fill="pink",#color of bars
            colour="black",#color of bar outline
            alpha= 1,#transparency of bar
-           binwidth = 1) + #size of bars
+           binwidth = 5) + #size of bars
   labs(title = "Shell Length Distribution in Spring 2024",
        x = "Shell Length (mm)",
        y = "Owl Limpet Count")+
@@ -365,25 +365,15 @@ qqnorm(log_size_dist_all_seasons$sqr_sl)
 sl_lmer<-lmer(SL_mm~Season+(1|Plot_Name), data = size_dist_all_seasons)
 check_model(sl_lmer)
 
-#glm
-sl_glm<-glm(SL_mm~Season, data = size_dist_all_seasons, 
+#glmer with family gamma because shell length is continuous
+sl_glm<-glmer(SL_mm~Season+(1|Plot_Name), data = size_dist_all_seasons, 
              family = Gamma(link="log"))
 check_model(sl_glm)
 anova(sl_glm)
 summary(sl_glm)
 
-#Post hoc tests
-emmeans(sl_glm, list(pairwise~Season), adjust = "tukey")
 
-#glmm
-sl_glmer<-glmer(SL_mm~Season+(1|Plot_Name), data = size_dist_all_seasons, 
-             family = Gamma(link="log"))
-check_model(sl_glmer)
-anova(sl_glm)
-summary(sl_glm)
 
-#Post hoc tests
-emmeans(sl_glmer, list(pairwise~Season), adjust = "tukey")
 
 
 #####################
@@ -394,6 +384,12 @@ scatter_full <- ggplot(size_dist_all_seasons,
   geom_smooth(method="lm")+
   facet_wrap(~Season)#regression line, add method = lm 
 scatter_full
+```
+
+# Post_hoc test for Shell Length Distributions
+```{r, Post_hoc test for Shell Length Distributions}
+#Post hoc tests
+emmeans(sl_glm, list(pairwise~Season), adjust = "tukey")
 ```
 
 
@@ -433,9 +429,6 @@ check_model(mod_density_all_seasons)
 anova(mod_density_all_seasons)
 summary(mod_density_all_seasons)
 
-#Post hoc tests
-emmeans(mod_density_all_seasons, list(pairwise~Seasons), adjust = "tukey")
-
 
 #i'm going to stick to the generalized mixed effects model because the data is not normally distributed.
 #glmm
@@ -446,12 +439,14 @@ check_model(density_glmm)
 anova(density_glmm)
 summary(density_glmm)
 
-#Post hoc tests
-emmeans(density_glmm, list(pairwise~Season), adjust = "tukey")
-
-
 
 ```
+# Post Hoc test for population density
+```{r}
+#Post hoc tests
+emmeans(density_glmm, list(pairwise~Season), adjust = "tukey")
+```
+
 
 # Linear models for Owl limpets Abundance per season
 ```{r, Linear models for Owl limpets Abundance per season}
@@ -473,24 +468,19 @@ summary(mod_abundance_all_seasons)
 #Post hoc tests
 emmeans(mod_abundance_all_seasons, list(pairwise~Season), adjust = "tukey")
 
-#glm
-abundance_all_seasons <-glm(n~Season, data = linear_abundance,family = poisson(link = "log"))
-check_model(abundance_all_seasons)
-anova(mod_abundance_all_seasons)
-summary(mod_abundance_all_seasons)
-
-#Post hoc test
-emmeans(abundance_all_seasons, list(pairwise~Season), adjust = "tukey")
-
+#using glmer because i am using transect as a random effect. I am using poisson distribution with log link because data is not normally distributed, even after transforming
 #glmm
 abun_per_seas_tran <-glmer(n~Season+(1|Plot_Name), data = linear_abundance,family = poisson(link = "log"))
 check_model(abun_per_seas_tran)
 anova(abun_per_seas_tran)
 summary(mod_abundance_all_seasons)
 
+```
+
+# Post Hoc test for Owl Limpet Abundance
+```{r, Post Hoc test for Owl Limpet Abundance}
 #Post hoc test
 emmeans(abun_per_seas_tran, list(pairwise~Season), adjust = "tukey")
-
 ```
 
 
