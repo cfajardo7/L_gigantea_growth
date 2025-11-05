@@ -318,6 +318,15 @@ size_dist_all_seasons <-master_sl %>%
   filter(Season!="Spring",
          Date!="2023_12_10")
 
+shell_lenght_mean_per_seas <- size_dist_all_seasons %>% 
+  group_by(Season, Plot_Name) %>% 
+  summarise(mean_sl = mean(SL_mm))
+
+anova_results <- aov(mean_sl ~ Season, data = shell_lenght_mean_per_seas)
+summary(anova_results)
+anova(anova_results)
+
+
 all_seasons_sl_boxplot <- ggplot(size_dist_all_seasons,
                                    aes(x=Season,
                                        y=SL_mm,
@@ -494,8 +503,8 @@ average_data <-master_sl %>%
 
 manova_data <-master_sl %>%
    filter(Season!="Spring", #not including re-tagging event
-          Date!="2023_12_10")  %>% #not including December
-   group_by(Season, Plot_Name) %>% 
+          Date!="2023_12_10") %>% #not including December
+   group_by(Season, Plot_Name)%>% 
    count()%>%
    mutate(limpet_density_m2 = n/20) %>% 
   mutate(Plot = as.factor(Plot_Name)) %>% 
@@ -573,5 +582,19 @@ long_mobiles <- mobiles_master %>%
   species %in%  "L_gigantea" ~ "mesograzer"))
 
 
+```
+
+# Temperature Data
+```{r, Temperature data}
+temperature_by_season <-master_temperature_data %>% 
+  group_by(Season)%>% 
+  separate(Date_Time, into = c("date_col", "time_col"), sep = " ", remove = FALSE) %>% 
+  summarise(mean_temp = mean(Temperature.C, na.rm = TRUE),
+            max_temp = max(Temperature.C, na.rm = TRUE),
+            min_temp = min(Temperature.C, na.rm = TRUE)) 
+
+ggplot(temperature_by_season, aes(x =date_col, y = Temperature.C))+
+  geom_line()+
+  geom_point(aes(color = Season))
 ```
 
