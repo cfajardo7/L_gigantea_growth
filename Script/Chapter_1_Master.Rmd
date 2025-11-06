@@ -356,10 +356,11 @@ shell_lenght_stats_per_seas <- size_dist_all_seasons %>%
             se_sl = sd_sl / sqrt(n_sl),
             med_sl = median(SL_mm),
             min_sl = min(SL_mm),
-            max_sl = max(SL_mm))
+            max_sl = max(SL_mm)) %>% 
+  mutate(Seasons = as.factor(Season))
 
 sl_med_SE <- ggplot(shell_lenght_stats_per_seas,
-                    aes(x = Season,
+                    aes(x = Seasons,
                         y = med_sl))+
   geom_point(show.legend = FALSE)+
   geom_errorbar(aes(ymin = mean_sl - sd_sl, ymax = mean_sl + sd_sl),
@@ -367,6 +368,7 @@ sl_med_SE <- ggplot(shell_lenght_stats_per_seas,
   labs(title = "Median and Standard Error  of Shell Length Distribution",
        x = "Season",
        y ="Shell Length")+
+  scale_x_discrete(labels=c("Fall","Spring","Winter"))+
   #scale_colour_brewer(palette = "Set3")+
   theme_bw()
 sl_med_SE
