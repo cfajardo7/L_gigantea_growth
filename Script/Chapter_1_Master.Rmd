@@ -52,6 +52,8 @@ library(devtools)
 #library(pairwiseAdonis)
 library(FSA)
 library(see)
+library(RColorBrewer)
+
 ```
 
 # Read in CSV
@@ -223,7 +225,8 @@ sep_cnm_pop_density <- Fall_data %>% #calling df with shell length data
   ggplot( aes(x=SL_mm)) + #Sl on x, I am not selecting y so R can use limpet count for density plot
   geom_histogram(fill="purple",#color of bars
            colour="black",#color of bar outline
-           alpha= 1)+#transparency of bar
+           alpha= 1,#transparency of bar
+           binwidth = 5)+#size of bin
   labs(title = "Shell Length Distribution in Fall 2023",
        x = "Shell Length (mm)",
        y = "Owl Limpet Count")+
@@ -231,9 +234,9 @@ sep_cnm_pop_density <- Fall_data %>% #calling df with shell length data
         axis.title.x = element_text(size = 10),
         axis.text.x = element_text(size = 9),
         axis.text.y = element_blank())+
-  #scale_x_continuous(limits = c(0,90))+ #lines I want to show up on x axis
-  #scale_y_continuous(limits = c(0,90))+ #lines I want to show up on y axis
-  geom_vline(xintercept = median(Fall_data$SL_mm),
+  scale_x_continuous(limits = c(0,90))+ #lines I want to show up on x axis
+  scale_y_continuous(limits = c(0,220))+ #lines I want to show up on y axis
+  geom_vline(xintercept = mean(Fall_data$SL_mm),
              colour="green")+ #draw line where average lies on density
   theme_bw()+
   facet_wrap(~Plot_Name)
@@ -259,7 +262,8 @@ Winter_pop_density <- Winter_data %>%
   ggplot( aes(x=SL_mm)) + #Sl on x, I am not selecting y so R can use limpet count for density plot
   geom_histogram(fill="blue",#color of bars
            colour="black",#color of bar outline
-           alpha= 1)+ #transparency of bar 
+           alpha= 1, #transparency of bar 
+           binwidth = 5)+ #bin size 
   labs(title = "Shell Length Distribution in Winter 2024",
          x = "Shell Length (mm)",
        y = "Owl Limpet Count")+
@@ -267,9 +271,9 @@ Winter_pop_density <- Winter_data %>%
         axis.title.x = element_text(size = 10),
         axis.text.x = element_text(size = 9),
         axis.text.y = element_blank())+
-  #scale_x_continuous(limits = c(0,90))+ #lines I want to show up on x axis
-  #scale_y_continuous(limits = c(0,90))+ #lines I want to show up on y axis
-  geom_vline(xintercept = median(Winter_data$SL_mm),
+  scale_x_continuous(limits = c(0,90))+ #lines I want to show up on x axis
+  scale_y_continuous(limits = c(0,220))+ #lines I want to show up on y axis
+  geom_vline(xintercept = mean(Winter_data$SL_mm),
              colour="green")+ #draw line where average lies on density
   theme_bw()+
   facet_wrap(~Plot_Name)
@@ -301,9 +305,9 @@ spring_pop_density <- Spring_data %>% #calling df with shell length data
         axis.title.x = element_text(size = 10),
         axis.text.x = element_text(size = 9),
         axis.text.y = element_blank())+
-  #scale_x_continuous(limits = c(0,90))+
-  #scale_y_continuous(limits = c(0,90))+
-  geom_vline(xintercept = median(Spring_data$SL_mm),
+  scale_x_continuous(limits = c(0,90))+
+  scale_y_continuous(limits = c(0,220))+
+  geom_vline(xintercept = mean(Spring_data$SL_mm),
              colour="green")+ #draw line where average lies on density
   theme_bw()+
   facet_wrap(~Plot_Name)
@@ -333,7 +337,8 @@ all_seasons_sl_boxplot <- ggplot(size_dist_all_seasons,
                                        fill=Season))+
   geom_boxplot(width = 0.7,
                show.legend = FALSE)+
-  labs(x = "Season",
+  labs(title = "Shell Length Distribution of Owl Limpets per Season",
+       x = "Season",
        y ="Shell Length")+
   scale_y_continuous(breaks = c(20,30,40,50,60,70,80,90))+
   scale_x_discrete(labels=c("Fall","Winter","Spring"))+
@@ -420,8 +425,9 @@ all_seasons_density_plot <- ggplot(all_seasons_Density_Data,
                                        y=log_density,
                                        fill=Season))+
   geom_boxplot(show.legend = FALSE)+
-  labs(x = "Season",
-       y ="Log Owl Limpet Density")+
+  labs(title = "Owl Limpet Density for All Seasons",
+       x = "Season",
+       y ="Log Owl Limpet Density/m2")+
   scale_x_discrete(labels=c("Fall","Winter","Spring"))+
   scale_fill_brewer(palette = "Dark2")+
   theme_bw()
@@ -456,6 +462,32 @@ summary(density_glmm)
 emmeans(density_glmm, list(pairwise~Season), adjust = "tukey")
 ```
 
+# Plots for Owl Limper Abundance
+```{r, Plots for Owl Limper Abundance}
+all_seasons_abundance_Data <- master_sl %>%
+   filter(Season!="Spring", #not including re-tagging event
+          Date!="2023_12_10")  %>% #not including December
+   group_by(Season, Plot_Name) %>% 
+   count() %>% 
+  mutate(Plot = as.factor(Plot_Name)) %>% 
+  mutate(log_abundance = log(n),
+          Seasons = as.factor(Season))
+
+all_seasons_abundance_plot <- ggplot(all_seasons_abundance_Data,
+                                   aes(x=Season,
+                                       y=log_abundance,
+                                       fill=Season))+
+  geom_boxplot(show.legend = FALSE)+
+  labs(title= "Owl Limpet Population Abundance for All Seasons",
+       x = "Season",
+       y ="Log Owl Limpet Abundance")+
+  scale_x_discrete(labels=c("Fall","Winter","Spring"))+
+  scale_fill_brewer(palette = "Accent")+
+  theme_bw()
+  
+all_seasons_abundance_plot
+```
+
 
 # Linear models for Owl limpets Abundance per season
 ```{r, Linear models for Owl limpets Abundance per season}
@@ -465,6 +497,11 @@ linear_abundance <-master_sl %>%
           Date!="2023_12_10")  %>% #not including December
    group_by(Season, Plot_Name) %>% 
    count() 
+
+abun_mod <- kruskal.test(n~Season, data=linear_abundance)
+dunnTest(n~Season,
+         linear_abundance,
+         method="bonferroni")
 
 shapiro.test(linear_abundance$abun)
 
