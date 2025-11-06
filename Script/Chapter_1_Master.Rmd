@@ -322,9 +322,6 @@ size_dist_all_seasons <-master_sl %>%
   filter(Season!="Spring",
          Date!="2023_12_10")
 
-shell_lenght_mean_per_seas <- size_dist_all_seasons %>% 
-  group_by(Season, Plot_Name) %>% 
-  summarise(mean_sl = mean(SL_mm))
 
 anova_results <- aov(mean_sl ~ Season, data = shell_lenght_mean_per_seas)
 summary(anova_results)
@@ -346,6 +343,33 @@ all_seasons_sl_boxplot <- ggplot(size_dist_all_seasons,
   scale_fill_brewer(palette = "Set3")+
   theme_bw()
 all_seasons_sl_boxplot
+```
+
+# Median graph
+```{r}
+shell_lenght_stats_per_seas <- size_dist_all_seasons %>% 
+  group_by(Season) %>% 
+  summarise(mean_sl = mean(SL_mm),
+            var_sl = var(SL_mm),
+            sd_sl = sd(SL_mm),
+            n_sl= n(),# Get the sample size for the group
+            se_sl = sd_sl / sqrt(n_sl),
+            med_sl = median(SL_mm),
+            min_sl = min(SL_mm),
+            max_sl = max(SL_mm))
+
+sl_med_SE <- ggplot(shell_lenght_stats_per_seas,
+                    aes(x = Season,
+                        y = med_sl))+
+  geom_point(show.legend = FALSE)+
+  geom_errorbar(aes(ymin = mean_sl - sd_sl, ymax = mean_sl + sd_sl),
+                   width = 0.2)+ # Adds the error bars
+  labs(title = "Median and Standard Error  of Shell Length Distribution",
+       x = "Season",
+       y ="Shell Length")+
+  #scale_colour_brewer(palette = "Set3")+
+  theme_bw()
+sl_med_SE
 ```
 
 # Analysis of Shell Length Distribution For all seasons
@@ -373,14 +397,15 @@ log_size_dist_all_seasons <-master_sl %>%
   mutate(log_sl= log(SL_mm),
          sqr_sl= sqrt(SL_mm))
 
-qqnorm(log_size_dist_all_seasons$sqr_sl)
+qqnorm(log_size_dist_all_seasons$log_sl)
 
 #lmer
-sl_lmer<-lmer(SL_mm~Season+(1|Plot_Name), data = size_dist_all_seasons)
+sl_lmer<-lmer(sqr_sl~Season+(1|Plot_Name), data = log_size_dist_all_seasons)
 check_model(sl_lmer)
+summary(sl_lmer)
 
 #glmer with family gamma because shell length is continuous
-sl_glm<-glmer(SL_mm~Season+(1|Plot_Name), data = size_dist_all_seasons, 
+sl_glm<-glmer(SL_mm~Season+(1|Plot_Name), data = log_size_dist_all_seasons, 
              family = Gamma(link="log"))
 check_model(sl_glm)
 anova(sl_glm)
