@@ -1,0 +1,571 @@
+---
+title: "Community Surveys Visualizations"
+author: "Cindy Fajardo"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.path = "../Output/")
+```
+
+#Welcome!
+In this repository I will have code to help visualize the raw community survey data collected at Cabrillo National Monument in San Diego, CA. I collected both sessile (percent cover) and mobile species (counts) data in the community found around the limpet population I am following for a year beginning September 2023. 
+
+#Libraries
+```{r, Libraries}
+library("rerddap")
+library(tidyverse)
+library("tidync")
+library("doParallel")
+library(lubridate)
+library(patchwork)
+library(viridis)
+library(here)
+library(kableExtra)
+library(hrbrthemes)
+library(emmeans)
+library(agricolae)
+library(vegan)
+library(performance)
+library(broom)
+library(car)
+library(lme4)
+library(lmerTest)
+library(pscl)
+library(ggridges)
+library(devtools)
+#library(pairwiseAdonis)
+library(ggpubr)
+library(glmmTMB)
+library(RColorBrewer)
+```
+
+#Read in CSV
+```{r, Read in CSV}
+#feb_cnm_sessile <- read_csv(here("Data", "2024_02_CNM_Sessile_Data.csv"))
+#feb_cnm_mobiles <- read_csv(here("Data","2024_02_CNM_Mobile_Data.csv"))
+#feb_cnm_mob_count_mat <- read_csv(here("Data", "2024_02_CNM_Mobile_Count_Matrix.csv"))
+#feb_cnm_sessile_count_mat <- read_csv(here("Data", "2024_02_CNM_Sessile_Count_Matrix.csv"))
+#sessile_master <- read_csv(here("Data", "2023_09_CNM_Sessile_Data.csv"))
+sess_percentcover <- read_csv(here("Data", "Master_CNM_Sessile_Percent_Data.csv"))
+mobiles_master <- read.csv(here("Data", "Master_CNM_Mobile_Data.csv"))
+mobiles_matrix_master <- read.csv(here("Data", "Master_CNM_Mobile_Matrix.csv"))
+sessile_matrix_master <- read.csv(here("Data", "Master_CNM_Sessile_Matrix.csv"))
+```
+
+#Data Manipulation of Mobile Species
+In this chunk, I manipulate the data to help visualize it
+```{r, #Data Manipulation}
+#feb_cnm_mobiles_sum_spec <- feb_cnm_mobiles %>% 
+#  mutate(spec_sum = rowSums(across(c(M_lugubris, L_dentiens, L_plena, L_keenae, L_limatula, L_scabra, Nuttallina_sp, Mopalia_sp, P_crassipes, T_eiseni, T_funebralis, T_gallina, L_gigantea)), na.rm=TRUE)) %>% 
+  # pivot_longer(cols = M_lugubris:L_gigantea, #pivoted to make longer
+               #names_to = "Species", #all species name in this column
+               #values_to = "Count")
+```
+
+
+#Boxplot of Mobile Organism Abundance Per Plot in Presence/Absence of Central Limpet
+```{r,Boxplot of Mobile Organism Abundance Per Plot in Presence/Absence of Central Limpet}
+ #feb_cnm_mobiles_sum_spec %>% 
+  #ggplot(aes(
+   # x = COL_pres,
+    #y = spec_sum,
+    #fill = COL_pres))+
+  #geom_boxplot(show.legend = FALSE)+ 
+ # scale_fill_brewer(palette = "Dark2")+
+  #labs(x = "Presence of Central Owl Limpet") +
+  #theme_bw()
+  
+```
+
+#Data Manipulation of Sessile Species
+Here, I manipulate the data to visualize the data. I separate it by animals and algae. 
+```{r, #Data Manipulation of Sessile Species}
+#feb_cnm_sessile_sum_plot <- feb_cnm_sessile %>%
+ # mutate(spec_sum = rowSums(across(c(A_elegantissima, Phragmatopoma_californica, Balanus_Chtalmus, Bare_rock, Ralfsia_sp, Coralline_crust, Endocladia_sp, P_polymerus,Ulva_sp)), na.rm=TRUE))%>% 
+  #mutate(Animal = (A_elegantissima+ Phragmatopoma_californica+ Balanus_Chtalmus+ P_polymerus)/spec_sum*100,
+   #      Algae = (Coralline_crust+Endocladia_sp+Ulva_sp)/spec_sum*100)
+```
+
+#Boxplot of Sessile Organism Percent Cover Per Plot in Presence/Absence of Central Limpet
+```{r, Boxplot of Sessile Organism Percent Cover Per Plot in Presence/Absence of Central Limpet}
+#feb_cnm_sessile_sum_plot %>% 
+ # pivot_longer(cols = c(Animal, Algae), names_to = "Percent_Type")%>%
+  #ggplot(aes(
+   # x = COL_pres,
+    #y = value,
+    #fill = Percent_Type))+
+  #geom_boxplot(show.legend = TRUE)+ 
+  #scale_fill_brewer(palette = "Pastel2")+
+  #scale_color_brewer(palette = "Pastel1")+
+  #labs(x = "Presence of Central Owl Limpet",
+   #    fill = "Percent Type") +
+  #theme_bw()
+
+```
+
+#Data Manipulation for Species Richness
+```{r, Data Manipulation for Species Richness}
+#feb_cnm_mob_count_mat$COL_pres <- as.factor(feb_cnm_mob_count_mat$COL_pres) #made this coulmn a factor
+#feb_cnm_mob_count_mat$Transect<- as.factor(feb_cnm_mob_count_mat$Transect)
+
+#USE THIS ONE
+#feb_cnm_mob_count_mat_sum <- feb_cnm_mob_count_mat %>% 
+ # mutate(spec_sum = rowSums(across(c(M_lugubris, L_dentiens, L_plena, L_keenae, L_limatula, L_scabra, Nuttallina_sp, Mopalia_sp, P_crassipes, T_eiseni, T_funebralis, T_gallina, L_gigantea)), na.rm=TRUE))
+
+```
+
+#Species Richness of Mobiles Boxplot
+```{r, Species Richness of Mobiles Boxplot}
+#feb_mobile_spec_rich_box <- feb_cnm_mob_count_mat_sum %>% 
+ # ggplot(aes(
+  #  x = COL_pres,
+   # y = spec_sum,
+    #fill = COL_pres))+
+  #geom_boxplot(show.legend = FALSE)+ 
+  #scale_fill_brewer(palette = "Dark2")+
+  #labs(x = "Presence")+
+  #theme_bw()
+#feb_mobile_spec_rich_box
+```
+
+#Sessile Species Richnnes Data Manipulation 
+```{r, Sessile Species Richnnes Data Manipulation}
+#feb_cnm_sessile_count_mat$COL_pres <- as.factor(feb_cnm_sessile_count_mat$COL_pres) #made this coulmn a factor
+#feb_cnm_sessile_count_mat$Transect<- as.factor(feb_cnm_sessile_count_mat$Transect)
+
+#Using this one
+#feb_cnm_sessile_count_mat_sum <- feb_cnm_sessile_count_mat %>% 
+ #   select(Transect, Plot_Name, L_R, Meter_no, COL_pres, Tag_ID, Anthopleura_elegantissima,Phragmatopoma_californica, Balanus_glandula, Chthalmus, Brown_encrusting, Coralline_crust, Endocladia_sp, Goose_neck, Ulva ) %>% 
+  #mutate(spec_sum = rowSums(across(c(Anthopleura_elegantissima,Phragmatopoma_californica, Balanus_glandula, Chthalmus, Brown_encrusting, Coralline_crust, Endocladia_sp, Goose_neck, Ulva)), na.rm=TRUE))
+
+####Try this###
+#feb_cnm_sessile_matrix <- feb_cnm_sessile_count_mat %>%
+ # mutate(spec_sum = rowSums(across(c(Anthopleura_elegantissima,Phragmatopoma_californica, Balanus_glandula, Chthalmus, Bare_rock, Brown_encrusting, Coralline_crust, Endocladia_sp, Goose_neck, Ulva)), na.rm=TRUE))%>% 
+  #mutate(Animal = (Anthopleura_elegantissima+ Phragmatopoma_californica+ Balanus_glandula+ Goose_neck+ Chthalmus),
+   #      Algae = (Brown_encrusting+Coralline_crust+Endocladia_sp+Ulva))
+
+```
+
+#Boxplot of Sessile Species Richness
+```{r, Boxplot of Sessile Species Richness}
+#feb_cnm_sessile_matrix %>% 
+ # pivot_longer(cols = c(Animal, Algae), names_to = "sessile_type")%>%
+  #ggplot(aes(
+   # x = COL_pres,
+    #y = value,
+    #fill = sessile_type))+
+  #geom_boxplot(show.legend = TRUE)+ 
+  #scale_fill_brewer(palette = "Pastel1")+
+  #scale_color_brewer(palette = "Set1")+
+  #labs(x = "Presence of Central Owl Limpet",
+   #    fill = "Percent Type") +
+  #theme_bw()
+
+```
+
+#Patchwork of Mobile Abundance and Sessile Percent Cover
+```{r, Patchwork of Mobile Abundance and Sessile Percent Cover}
+ #patch_mob <- feb_cnm_mobiles_sum_spec %>% 
+  #ggplot(aes(
+   # x = COL_pres,
+    #y = spec_sum,
+    #fill = COL_pres))+
+  #geom_boxplot(show.legend = FALSE)+ 
+  #scale_fill_brewer(palette = "Dark2")+
+  #labs(title = "Abundance of Mobile Species",
+   #    x = "Presence of Central Owl Limpet",
+    #   y = "Abundance of Other Mobile Organisms") +
+  #theme_bw()
+
+#patch_sess <- feb_cnm_sessile_sum_plot %>% 
+ # pivot_longer(cols = c(Animal, Algae), names_to = "percent_type")%>%
+  #ggplot(aes(
+   # x = COL_pres,
+    #y = value,
+    #fill = COL_pres,
+    #color = percent_type))+
+  #geom_boxplot(show.legend = TRUE)+ 
+  #scale_fill_brewer(palette = "Pastel1")+
+  #scale_color_brewer(palette = "Set1")+
+  #labs(title = "Percent Cover of Sessile Species",
+   #    x = "Presence of Central Owl Limpet",
+    #   y = "Percent Cover") +
+  #theme_bw()
+
+#patch_mob+patch_sess+
+ # plot_annotation(title = 'Winter Total Aundance of Mobiles Species and Percent Cover of Sessile Species in the Presence/Absence of Owl Limpets', theme = theme(plot.title = element_text(size = 12)))
+```
+
+#Patchwork of species richness for mobiles and sessile
+```{r, Patchwork of species richness for mobiles and sessile}
+#mobile_spec_rich_box_nolab <- feb_cnm_mob_count_mat_sum %>% 
+ # ggplot(aes(
+  #  x = COL_pres,
+   # y = spec_sum,
+    #fill = COL_pres))+
+  #geom_boxplot(show.legend = FALSE)+ 
+  #scale_fill_brewer(palette = "Dark2")+
+  #labs(title = "Mobiles",
+   #    x = "Presence/Absence",
+    #   y = "Species Richness")+
+  #theme_bw()
+
+#sessile_spec_rich_nolab <- feb_cnm_sessile_count_mat_sum %>% 
+ # ggplot(aes(
+  #  x = COL_pres,
+   # y = spec_sum,
+    #fill = COL_pres))+
+  #geom_boxplot(show.legend = FALSE)+
+  #scale_fill_brewer(palette = "Dark2")+
+  #labs(title = "Sessile",
+   #    x = "Presence/Absence",
+    #   y = "Species Richness")+
+  #theme_bw()
+
+
+#mobile_spec_rich_box_nolab+sessile_spec_rich_nolab+
+ # plot_annotation(title = 'Winter Species Richness of Mobiles and Sessile Species in the Presence/Absence of Owl Limpets',
+  #                theme = theme(plot.title = element_text(size = 15)))
+```
+####New Script For All Seasons####
+
+#Data Manipulation for Mobile Species Abundance
+```{r, Data Manipulation for Mobile Species Abundance}
+cnm_mobiles_sum_spec <- mobiles_master %>%
+  group_by(Season) %>% 
+  mutate(spec_sum = rowSums(across(c(M_lugubris, L_hartwegii, L_dentiens, L_plena, L_keenae, L_limatula, L_scabra, Nuttallina_sp, Mopalia_sp, P_crassipes, T_eiseni, T_funebralis, T_gallina, L_gigantea)), na.rm=TRUE)) %>% 
+   pivot_longer(cols = M_lugubris:L_gigantea, #pivoted to make longer
+               names_to = "Species", #all species name in this column
+               values_to = "Count") %>% 
+  mutate(log_spec_sum = log(spec_sum+1))
+```
+
+#2-Boxplot of Mobile Organism Abundance Per Plot in Presence/Absence of Central Limpet
+```{r,2-Boxplot of Mobile Organism Abundance Per Plot in Presence/Absence of Central Limpet}
+ mob_boxplot <- cnm_mobiles_sum_spec %>% 
+  ggplot(aes(
+    x = Season,
+    y = log_spec_sum,
+    fill = COL_pres))+
+  geom_boxplot()+
+  labs(title = "Mobile Invertebrate Abundance in the Presence/Absence of a Central Owl Limpet",
+       x = "Season",
+       y = "Log Mobile Abundance",
+       fill = "COL Present") +
+  scale_x_discrete(limits = c("Fall", "Winter", "Spring"))+
+  scale_fill_brewer(palette = "Accent")+
+  theme_bw()
+mob_boxplot  
+```
+
+#General Linear Models for Mobile Abundance
+R got stuck in this chunk, remove hashtags
+```{r, General Linear Models for Mobile Abundance}
+mob_abun_mod<-lmer(log_spec_sum~COL_pres*Season+(1|Transect), data = cnm_mobiles_sum_spec)
+#plot(mob_abun_mod)
+check_model(mob_abun_mod)
+qqnorm(cnm_mobiles_sum_spec$log_spec_sum)
+#anova(mob_abun_mod)
+#summary(mob_abun_mod)
+
+mob_abun_mod2<-glmer(spec_sum~COL_pres*Season+(1|Transect), family = "poisson"(link="log"), data = cnm_mobiles_sum_spec)
+check_model(mob_abun_mod2)
+qqnorm(cnm_mobiles_sum_spec$spec_sum)
+anova(mob_abun_mod2)
+summary(mob_abun_mod2)
+```
+
+#Post Hoc test for Mobile Abundace
+Remove hashtags, code works
+```{r, Post Hoc test for Mobile Abundace}
+emmeans(mob_abun_mod2, list(pairwise~COL_pres*Season), adjust = "tukey")
+```
+
+#Data Manipulation for Sessile Percent Cover Across Seasons
+```{r, Sessile Species Abundance}
+#Make columns into factors
+#feb_cnm_sessile$COL_pres <- as.factor(feb_cnm_sessile$COL_pres) #made this column a factor THIS IMPORTANT FOR nMDS
+#feb_cnm_sessile$Transect<- as.factor(feb_cnm_sessile$Transect)
+
+
+cnm_sessile_sum_plot <- sess_percentcover %>%
+  group_by(Season) %>% 
+  mutate(spec_sum = rowSums(across(c(A_elegantissima, Phragmatopoma_californica, Chtalmus_Balanus, Bare_rock, Ralfsia_sp, Coralline_crust, Endocaldia_sp, P_polymerus,Ulva_sp)), na.rm=TRUE))%>% 
+  mutate(Sessile_Invertebrate = (A_elegantissima+ Phragmatopoma_californica+ Chtalmus_Balanus+ P_polymerus)/spec_sum*100,
+         Algae = (Ralfsia_sp+Coralline_crust+Endocaldia_sp+Ulva_sp)/spec_sum*100)
+
+```
+
+#Boxplot of Sessile Organism Percent Cover in Presence/Absence of Central Limpet Per Season
+```{r, Boxplot of Sessile Organism Percent Cover in Presence/Absence of Central Limpet Per Season}
+cnm_sessile_sum_plot$Season <- as.factor(cnm_sessile_sum_plot$Season)
+
+sess_boxplot <- cnm_sessile_sum_plot %>%
+  mutate(Season = factor(Season, levels = c("Fall", "Winter", "Spring"))) %>% 
+  pivot_longer(cols = c(Sessile_Invertebrate, Algae), names_to = "Percent_Type")%>%
+  ggplot(aes(
+    x = COL_pres,
+    y = value,
+    fill = Percent_Type))+
+  geom_boxplot(show.legend = TRUE)+
+  labs(x = "Presence/Absence of Central Owl Limpet",
+       y = "Percent Cover",
+       fill = "Percent Sessile Type")+
+  scale_fill_brewer(palette = "Pastel1")+
+  scale_color_brewer(palette = "Dark2")+
+  theme_bw()+
+  facet_grid(Percent_Type~Season)
+sess_boxplot
+```
+
+#Liner Models for Sessile Animal Percent Cover
+Chunk works, remove hasthags
+```{r}
+#mixed effects model
+sess_ani_perc_mod <- lmer(Sessile_Invertebrate~COL_pres*Season+(1|Transect), data = cnm_sessile_sum_plot)
+#plot(sess_ani_perc_mod)
+check_model(sess_ani_perc_mod)
+qqnorm(cnm_sessile_sum_plot$Sessile_Invertebrate)
+var(cnm_sessile_sum_plot$Sessile_Invertebrate)
+mean(cnm_sessile_sum_plot$Sessile_Invertebrate)
+#anova(sess_ani_perc_mod)
+#summary(sess_ani_perc_mod)
+
+#genelized linear effects model
+#using glmer.nb() implicitly uses a negative binomial distribution and a log link
+sess_ani_perc_mod2 <-  glmer.nb(Sessile_Invertebrate~COL_pres*Season+(1|Transect),
+                            control = glmerControl(optimizer = "bobyqa"),
+                            data = cnm_sessile_sum_plot)
+check_model(sess_ani_perc_mod2)
+summary(sess_ani_perc_mod2)
+
+```
+
+#Post Hoc test for Sessile Animal Percent Cover
+Chunk works, remove hashtags
+```{r}
+emmeans(sess_ani_perc_mod2, list(pairwise~COL_pres*Season), adjust = "tukey")
+
+```
+
+#Liner Models for Sessile Algae Percent Cover
+```{r}
+#lmer
+algae_perc_mod <- lmer(Algae~COL_pres*Season+(1|Transect), data = cnm_sessile_sum_plot)
+check_model(algae_perc_mod)
+qqnorm(cnm_sessile_sum_plot$Algae)
+anova(algae_perc_mod)
+summary(algae_perc_mod)
+
+#using glmer.nb() implicitly uses a negative binomial distribution and a log link
+algae_perc_mod2 <- glmer.nb(Algae~COL_pres*Season+(1|Transect),
+                        data = cnm_sessile_sum_plot,
+                        control = glmerControl(optimizer = "bobyqa"))
+check_model(algae_perc_mod2)
+summary(algae_perc_mod2)
+
+```
+
+#Post Hoc test for Algae Percent Cover
+```{r, Post Hoc test for Algae Percent Cover}
+emmeans(algae_perc_mod2, list(pairwise~COL_pres*Season), adjust = "tukey")
+```
+
+#Data Manipulation for Mobiles Species Richness
+```{r, Data Manipulation for Mobiles Species Richness}
+mob_count_mat_sum <- mobiles_matrix_master %>% 
+  mutate(spec_sum = rowSums(across(c(M_lugubris, L_hartwegii, L_dentiens, L_plena, L_keenae, L_limatula, L_scabra, Nuttallina_sp, Mopalia_sp, P_crassipes, T_eiseni, T_funebralis, T_gallina, L_gigantea)), na.rm=TRUE)) %>% 
+  mutate(log_spec_sum = log(spec_sum+1))
+
+ggqqplot(mob_count_mat_sum$log_spec_sum)
+qqnorm(mob_count_mat_sum$log_spec_sum)
+```
+
+#Boxplot of Mobiles Species Richness Across Seasons
+```{r, Boxplot of Mobiles Species Richness Across Seasons}
+mobile_spec_rich_box <- mob_count_mat_sum %>% 
+  ggplot(aes(
+    x = Season,
+    y = log_spec_sum,
+    fill = COL_pres,
+    color = COL_pres))+
+  geom_boxplot(show.legend = TRUE)+ 
+  scale_fill_brewer(palette = "PuBuGn")+
+  labs(title = "Mobile Invertabrate Species Richness in Presence/Absence of Central Owl Limpet",
+       x = "Season",
+       y = "Log Sum of Mobile Species Richness",
+       color = "Central OL Present",
+       fill = "Central OL Present")+
+  scale_x_discrete(limits = c("Fall", "Winter", "Spring"))+
+  theme_bw()
+mobile_spec_rich_box
+```
+
+#General Linear Models for Mobile Species Richness
+```{r, General Linear Models for Mobile Species Richness}
+#lmer
+mob_spec_rich_mod<-lmer(log_spec_sum~COL_pres*Season+(1|Transect), data = mob_count_mat_sum)
+plot(mob_spec_rich_mod)
+check_model(mob_spec_rich_mod)
+ggqqplot(mob_count_mat_sum$log_spec_sum)
+anova(mob_spec_rich_mod)
+summary(mob_spec_rich_mod)
+
+#glmer
+mob_spec_rich_mod2<-glmer(spec_sum~COL_pres*Season+(1|Transect), 
+                          family = poisson(link = "log"),
+                          data = mob_count_mat_sum)
+check_model(mob_spec_rich_mod2)
+qqnorm(mob_count_mat_sum$spec_sum)
+summary(mob_spec_rich_mod2)
+```
+
+#Post Hoc test for Mobile Species Richness
+```{r, Post Hoc test for Mobile Species Richness}
+emmeans(mob_spec_rich_mod2, list(pairwise~COL_pres*Season), adjust = "tukey")
+```
+
+#Data Manipulation For Sessile Species Richness
+```{r}
+sessile_spec_rich_matrix <- sessile_matrix_master %>%
+  mutate(spec_sum = rowSums(across(c(A_elegantissima,Phragmatopoma_californica, Chtalmus_Balanus, Ralfsia_sp, Coralline_crust, Endocaldia_sp, P_polymerus, Ulva_sp)), na.rm=TRUE))%>% 
+  mutate(Sessile_Invertebrate = (A_elegantissima+ Phragmatopoma_californica+ Chtalmus_Balanus+ P_polymerus),
+         Algae = (Ralfsia_sp+Coralline_crust+Endocaldia_sp+Ulva_sp)) %>% 
+  mutate(log_spec_sum = log(spec_sum+1),
+         log_algae = log(Algae+1),
+         log_sess_invert = log(Sessile_Invertebrate+1))
+
+ggqqplot(sessile_spec_rich_matrix$log_spec_sum)
+
+```
+
+#Boxplot for Sessile Species Richness
+```{r}
+cnm_sessile_sum_plot$Season <- as.factor(cnm_sessile_sum_plot$Season)
+
+sessile_spec_rich_boxplot <- sessile_spec_rich_matrix %>% 
+  mutate(Season = factor(Season, levels = c("Fall", "Winter", "Spring"))) %>% 
+  pivot_longer(cols = c(Sessile_Invertebrate, Algae), names_to = "sessile_type")%>%
+  ggplot(aes(
+    x = COL_pres,
+    y = value,
+    fill = sessile_type))+
+  geom_boxplot(show.legend = TRUE)+ 
+  scale_fill_brewer(palette = "Pastel1")+
+  scale_color_brewer(palette = "Set1")+
+  labs(x = "Presence/Absence of Central Owl Limpet",
+       y = "Sum of Species Richness",
+       fill = "Percent Sessile Type") +
+  theme_bw()+
+  facet_grid(sessile_type~Season)
+sessile_spec_rich_boxplot
+
+```
+
+#Generalized Linear Models for Sessile Animals Species Richness
+```{r, Generalized Linear Models for Sessile Animals Species Richness}
+#lmer
+sess_ani_spec_rich_mod<-lmer(log_sess_invert~COL_pres*Season+(1|Transect), data = sessile_spec_rich_matrix)
+check_model(sess_ani_spec_rich_mod)
+qqnorm(sessile_spec_rich_matrix$log_sess_invert)
+ggqqplot(sessile_spec_rich_matrix$log_sess_invert)
+
+#glmer
+sess_ani_spec_rich_mod2<-glmer(Sessile_Invertebrate~COL_pres*Season+(1|Transect), 
+                          family = poisson(link = "log"),
+                          data = sessile_spec_rich_matrix)
+check_model(sess_ani_spec_rich_mod2)
+summary(sess_ani_spec_rich_mod2)
+```
+
+# Generalized Linear Models for Sessile Algae Species Richness
+```{r, Generalized Linear Models for Sessile Algae Species Richness}
+#lmer
+sess_algae_spec_rich_mod<-lmer(log_algae~COL_pres*Season+(1|Transect), data = sessile_spec_rich_matrix)
+check_model(sess_ani_spec_rich_mod)
+qqnorm(sessile_spec_rich_matrix$log_sess_invert)
+ggqqplot(sessile_spec_rich_matrix$log_sess_invert)
+summary(sess_algae_spec_rich_mod)
+
+#glmer with poisson distribution and log link
+sess_algae_spec_rich_mod2<-glmer(Algae~COL_pres*Season+(1|Transect), 
+                          family = poisson(link = "log"),
+                          data = sessile_spec_rich_matrix)
+check_model(sess_algae_spec_rich_mod2)
+summary(sess_algae_spec_rich_mod2)
+
+#glmer with negative binomial family
+sess_algae_spec_rich_mod3 <- glmer.nb(Algae~COL_pres*Season+(1|Transect),
+                        data = sessile_spec_rich_matrix,
+                        control = glmerControl(optimizer = "bobyqa"))
+summary(sess_algae_spec_rich_mod3)
+
+```
+
+# Post-Hoc Testing for Sessile Algae Species Richness
+```{r, Post-Hoc Testing for Sessile Algae Species Richness}
+emmeans(sess_algae_spec_rich_mod2, list(pairwise~COL_pres*Season), adjust = "tukey")
+
+```
+
+# Generalized Linear Model for All Sessile Species Richness
+```{r, Generalized Linear Model for All Sessile Species Richness}
+#lmer assuming normality
+all_sess_spec_rich_mod<-lmer(log_spec_sum~COL_pres*Season+(1|Transect), data = sessile_spec_rich_matrix)
+check_model(all_sess_spec_rich_mod)
+summary(all_sess_spec_rich_mod)
+
+#glmer for non-normal data
+all_sess_spec_rich_mod2<-glmer(spec_sum~COL_pres*Season+(1|Transect), 
+                          family = poisson(link = "log"),
+                          data = sessile_spec_rich_matrix)
+check_model(all_sess_spec_rich_mod2)
+summary(all_sess_spec_rich_mod2)
+
+
+```
+
+# Post-Hoc Testing for All Sessile Species Richness
+```{r, Post-Hoc Testing for All Sessile Species Richness}
+emmeans(all_sess_spec_rich_mod2, list(pairwise~COL_pres*Season), adjust = "tukey")
+```
+
+#Patchwork for Mobile Species Abundance and Richness
+```{r, Patchwork for Mobile Species Abundance and Richness}
+patch_mob_abun <- cnm_mobiles_sum_spec %>% 
+  ggplot(aes(
+    x = Season,
+    y = log_spec_sum,
+    color = COL_pres,
+    fill = COL_pres))+
+  geom_boxplot()+
+  scale_fill_brewer(palette = "Accent")+
+  labs(x = "Season",
+       y = "Log Mobile Species Abundance",
+       fill = "Central OL Present",
+       color = "Central OL Present") +
+  theme_bw(base_size = 8)
+
+patch_mob_spec_rich <- mob_count_mat_sum %>% 
+  ggplot(aes(
+    x = Season,
+    y = log_spec_sum,
+    fill = COL_pres,
+    color = COL_pres))+
+  geom_boxplot(show.legend = TRUE)+ 
+  scale_fill_brewer(palette = "Dark2")+
+  labs(x = "Season",
+       y = "Log Mobile Species Richness",
+       color = "Central OL Present",
+       fill = "Central OL Present")+
+  theme_bw(base_size = 8)
+
+patch_mob_abun/patch_mob_spec_rich+
+ plot_annotation(tag_levels = 'A')
+```
+
