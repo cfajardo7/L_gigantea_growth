@@ -42,6 +42,8 @@ library(devtools)
 library(ggpubr)
 library(glmmTMB)
 library(RColorBrewer)
+library(MASS)
+library(DHARMa)
 ```
 
 #Read in CSV
@@ -256,10 +258,12 @@ cnm_mobiles_sum_spec <- mobiles_master %>%
   labs(title = "Mobile Invertebrate Abundance in the Presence/Absence of a Central Owl Limpet",
        x = "Season",
        y = "Log Mobile Abundance",
-       fill = "COL Present") +
-  scale_x_discrete(limits = c("Fall", "Winter", "Spring"))+
+       fill = "Owl Limpet Present")+
   scale_fill_brewer(palette = "Accent")+
-  theme_bw()
+  theme_bw()+
+  theme(axis.text.x = element_text(size = 15),
+        axis.title.x = element_text(size = 18, face = "bold"),
+       axis.title.y = element_text(size = 18, face = "bold"))
 mob_boxplot  
 ```
 
@@ -275,6 +279,10 @@ qqnorm(cnm_mobiles_sum_spec$log_spec_sum)
 
 mob_abun_mod2<-glmer(spec_sum~COL_pres*Season+(1|Transect), family = "poisson"(link="log"), data = cnm_mobiles_sum_spec)
 check_model(mob_abun_mod2)
+check_overdispersion(mob_abun_mod2)
+ abun_res <- simulateResiduals(mob_spec_rich_mod2)
+    plot(abun_res) # Visual inspection for overdispersion
+    testDispersion(abun_res) # Formal test
 qqnorm(cnm_mobiles_sum_spec$spec_sum)
 anova(mob_abun_mod2)
 summary(mob_abun_mod2)
@@ -296,7 +304,7 @@ emmeans(mob_abun_mod2, list(pairwise~COL_pres*Season), adjust = "tukey")
 cnm_sessile_sum_plot <- sess_percentcover %>%
   group_by(Season) %>% 
   mutate(spec_sum = rowSums(across(c(A_elegantissima, Phragmatopoma_californica, Chtalmus_Balanus, Bare_rock, Ralfsia_sp, Coralline_crust, Endocaldia_sp, P_polymerus,Ulva_sp)), na.rm=TRUE))%>% 
-  mutate(Sessile_Invertebrate = (A_elegantissima+ Phragmatopoma_californica+ Chtalmus_Balanus+ P_polymerus)/spec_sum*100,
+  mutate(Sessile_Invertebrate = (A_elegantissima+ Phragmatopoma_californica+ Chtalmus_Balanus+ P_polymerus)/spec_sum,
          Algae = (Ralfsia_sp+Coralline_crust+Endocaldia_sp+Ulva_sp)/spec_sum*100)
 
 ```
@@ -311,7 +319,7 @@ sess_boxplot <- cnm_sessile_sum_plot %>%
   ggplot(aes(
     x = COL_pres,
     y = value,
-    fill = Percent_Type))+
+    fill = COL_pres))+
   geom_boxplot(show.legend = TRUE)+
   labs(x = "Presence/Absence of Central Owl Limpet",
        y = "Percent Cover",
@@ -343,6 +351,9 @@ sess_ani_perc_mod2 <-  glmer.nb(Sessile_Invertebrate~COL_pres*Season+(1|Transect
                             data = cnm_sessile_sum_plot)
 check_model(sess_ani_perc_mod2)
 summary(sess_ani_perc_mod2)
+
+model_fit <- glmmTMB(Sessile_Invertebrate~COL_pres*Season+(1|Transect), data = cnm_sessile_sum_plot,
+                    family = beta_family(link = "logit"))
 
 ```
 
@@ -391,7 +402,7 @@ qqnorm(mob_count_mat_sum$log_spec_sum)
 mobile_spec_rich_box <- mob_count_mat_sum %>% 
   ggplot(aes(
     x = Season,
-    y = log_spec_sum,
+    y = spec_sum,
     fill = COL_pres,
     color = COL_pres))+
   geom_boxplot(show.legend = TRUE)+ 
@@ -399,10 +410,13 @@ mobile_spec_rich_box <- mob_count_mat_sum %>%
   labs(title = "Mobile Invertabrate Species Richness in Presence/Absence of Central Owl Limpet",
        x = "Season",
        y = "Log Sum of Mobile Species Richness",
-       color = "Central OL Present",
-       fill = "Central OL Present")+
-  scale_x_discrete(limits = c("Fall", "Winter", "Spring"))+
-  theme_bw()
+       color = "Owl Limpet Present",
+       fill = "Owl Limpet Present")+
+  #scale_x_discrete(limits = c("Fall", "Spring", "Winter"))
+  theme_bw()+
+  theme(axis.text.x = element_text(size = 15),
+        axis.title.x = element_text(size = 18, face = "bold"),
+       axis.title.y = element_text(size = 15, face = "bold"))
 mobile_spec_rich_box
 ```
 
@@ -412,7 +426,7 @@ mobile_spec_rich_box
 mob_spec_rich_mod<-lmer(log_spec_sum~COL_pres*Season+(1|Transect), data = mob_count_mat_sum)
 plot(mob_spec_rich_mod)
 check_model(mob_spec_rich_mod)
-ggqqplot(mob_count_mat_sum$log_spec_sum)
+qqnorm(mob_count_mat_sum$log_spec_sum)
 anova(mob_spec_rich_mod)
 summary(mob_spec_rich_mod)
 
@@ -420,14 +434,28 @@ summary(mob_spec_rich_mod)
 mob_spec_rich_mod2<-glmer(spec_sum~COL_pres*Season+(1|Transect), 
                           family = poisson(link = "log"),
                           data = mob_count_mat_sum)
+ check_overdispersion(mob_spec_rich_mod2)
+ sim_res <- simulateResiduals(mob_spec_rich_mod2)
+    plot(sim_res) # Visual inspection for overdispersion
+    testDispersion(sim_res) # Formal test
 check_model(mob_spec_rich_mod2)
 qqnorm(mob_count_mat_sum$spec_sum)
 summary(mob_spec_rich_mod2)
+model.matrix(mob_spec_rich_mod2, data = mob_count_mat_sum)
+vif(mob_spec_rich_mod2)
+
+#glmer negative binomial
+mob_spec_rich_mod3<-glmer.nb(spec_sum~COL_pres*Season+(1|Transect), 
+                          data = mob_count_mat_sum)
+check_model(mob_spec_rich_mod3)
+summary(mob_spec_rich_mod3)
+
 ```
 
 #Post Hoc test for Mobile Species Richness
 ```{r, Post Hoc test for Mobile Species Richness}
 emmeans(mob_spec_rich_mod2, list(pairwise~COL_pres*Season), adjust = "tukey")
+
 ```
 
 #Data Manipulation For Sessile Species Richness
@@ -435,8 +463,7 @@ emmeans(mob_spec_rich_mod2, list(pairwise~COL_pres*Season), adjust = "tukey")
 sessile_spec_rich_matrix <- sessile_matrix_master %>%
   mutate(spec_sum = rowSums(across(c(A_elegantissima,Phragmatopoma_californica, Chtalmus_Balanus, Ralfsia_sp, Coralline_crust, Endocaldia_sp, P_polymerus, Ulva_sp)), na.rm=TRUE))%>% 
   mutate(Sessile_Invertebrate = (A_elegantissima+ Phragmatopoma_californica+ Chtalmus_Balanus+ P_polymerus),
-         Algae = (Ralfsia_sp+Coralline_crust+Endocaldia_sp+Ulva_sp)) %>% 
-  mutate(log_spec_sum = log(spec_sum+1),
+         Algae = (Ralfsia_sp+Coralline_crust+Endocaldia_sp+Ulva_sp)) %>%  mutate(log_spec_sum = log(spec_sum+1),
          log_algae = log(Algae+1),
          log_sess_invert = log(Sessile_Invertebrate+1))
 

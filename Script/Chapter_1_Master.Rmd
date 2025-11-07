@@ -362,15 +362,28 @@ shell_lenght_stats_per_seas <- size_dist_all_seasons %>%
 sl_med_SE <- ggplot(shell_lenght_stats_per_seas,
                     aes(x = Seasons,
                         y = med_sl))+
-  geom_point(show.legend = FALSE)+
+  geom_point(show.legend = FALSE,
+             size = 5)+
   geom_errorbar(aes(ymin = mean_sl - sd_sl, ymax = mean_sl + sd_sl),
-                   width = 0.2)+ # Adds the error bars
+                   width = 0.2,
+                show.legend = FALSE)+ 
+  geom_jitter(data = size_dist_all_seasons,
+              aes(x = Season,
+                  y = SL_mm),
+              alpha = 0.1,
+              width = 0.15,
+              color = "purple",
+              show.legend = FALSE)+
   labs(title = "Median and Standard Error  of Shell Length Distribution",
        x = "Season",
-       y ="Shell Length")+
+       y ="Shell Length",
+       axis.title.x = element_text(18))+
   scale_x_discrete(labels=c("Fall","Spring","Winter"))+
-  #scale_colour_brewer(palette = "Set3")+
-  theme_bw()
+  #scale_colour_brewer(palette = "Set3")
+  theme_bw()+
+  theme(axis.text.x = element_text(size = 15),
+        axis.title.x = element_text(size = 18, face = "bold"),
+       axis.title.y = element_text(size = 18, face = "bold"))
 sl_med_SE
 ```
 
@@ -455,9 +468,12 @@ all_seasons_density_plot <- ggplot(all_seasons_Density_Data,
   labs(title = "Owl Limpet Density for All Seasons",
        x = "Season",
        y ="Log Owl Limpet Density/m2")+
-  scale_x_discrete(labels=c("Fall","Winter","Spring"))+
+  scale_x_discrete(labels=c("Fall","Spring","Winter"))+
   scale_fill_brewer(palette = "Dark2")+
-  theme_bw()
+  theme_bw()+
+  theme(axis.text.x = element_text(size = 15),
+        axis.title.x = element_text(size = 18, face = "bold"),
+       axis.title.y = element_text(size = 15, face = "bold"))
   
 all_seasons_density_plot  
 ```
