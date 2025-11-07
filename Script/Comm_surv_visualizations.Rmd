@@ -352,8 +352,8 @@ sess_ani_perc_mod2 <-  glmer.nb(Sessile_Invertebrate~COL_pres*Season+(1|Transect
 check_model(sess_ani_perc_mod2)
 summary(sess_ani_perc_mod2)
 
-model_fit <- glmmTMB(Sessile_Invertebrate~COL_pres*Season+(1|Transect), data = cnm_sessile_sum_plot,
-                    family = beta_family(link = "logit"))
+#model_fit <- glmmTMB(Sessile_Invertebrate~COL_pres*Season+(1|Transect), data = cnm_sessile_sum_plot,
+                    #family = beta_family(link = "logit"))
 
 ```
 
