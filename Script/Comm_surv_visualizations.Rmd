@@ -270,28 +270,28 @@ mob_boxplot
 #General Linear Models for Mobile Abundance
 R got stuck in this chunk, remove hashtags
 ```{r, General Linear Models for Mobile Abundance}
-mob_abun_mod<-lmer(log_spec_sum~COL_pres*Season+(1|Transect), data = cnm_mobiles_sum_spec)
+#mob_abun_mod<-lmer(log_spec_sum~COL_pres*Season+(1|Transect), data = cnm_mobiles_sum_spec)
 #plot(mob_abun_mod)
-check_model(mob_abun_mod)
-qqnorm(cnm_mobiles_sum_spec$log_spec_sum)
+#check_model(mob_abun_mod)
+#qqnorm(cnm_mobiles_sum_spec$log_spec_sum)
 #anova(mob_abun_mod)
 #summary(mob_abun_mod)
 
-mob_abun_mod2<-glmer(spec_sum~COL_pres*Season+(1|Transect), family = "poisson"(link="log"), data = cnm_mobiles_sum_spec)
-check_model(mob_abun_mod2)
-check_overdispersion(mob_abun_mod2)
- abun_res <- simulateResiduals(mob_spec_rich_mod2)
-    plot(abun_res) # Visual inspection for overdispersion
-    testDispersion(abun_res) # Formal test
-qqnorm(cnm_mobiles_sum_spec$spec_sum)
-anova(mob_abun_mod2)
-summary(mob_abun_mod2)
+#mob_abun_mod2<-glmer(spec_sum~COL_pres*Season+(1|Transect), family = "poisson"(link="log"), data = cnm_mobiles_sum_spec)
+#check_model(mob_abun_mod2)
+#check_overdispersion(mob_abun_mod2)
+ #abun_res <- simulateResiduals(mob_spec_rich_mod2)
+  #  plot(abun_res) # Visual inspection for overdispersion
+   # testDispersion(abun_res) # Formal test
+#qqnorm(cnm_mobiles_sum_spec$spec_sum)
+#anova(mob_abun_mod2)
+#summary(mob_abun_mod2)
 ```
 
 #Post Hoc test for Mobile Abundace
 Remove hashtags, code works
 ```{r, Post Hoc test for Mobile Abundace}
-emmeans(mob_abun_mod2, list(pairwise~COL_pres*Season), adjust = "tukey")
+#emmeans(mob_abun_mod2, list(pairwise~COL_pres*Season), adjust = "tukey")
 ```
 
 #Data Manipulation for Sessile Percent Cover Across Seasons

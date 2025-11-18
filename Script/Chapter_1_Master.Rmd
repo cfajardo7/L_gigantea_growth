@@ -323,9 +323,9 @@ size_dist_all_seasons <-master_sl %>%
          Date!="2023_12_10")
 
 
-anova_results <- aov(mean_sl ~ Season, data = shell_lenght_mean_per_seas)
-summary(anova_results)
-anova(anova_results)
+#anova_results <- aov(mean_sl ~ Season, data = shell_lenght_mean_per_seas)
+#summary(anova_results)
+#anova(anova_results)
 
 
 all_seasons_sl_boxplot <- ggplot(size_dist_all_seasons,
@@ -339,7 +339,7 @@ all_seasons_sl_boxplot <- ggplot(size_dist_all_seasons,
        y ="Shell Length")+
   scale_y_continuous(breaks = c(20,30,40,50,60,70,80,90))+
   scale_x_discrete(labels=c("Fall","Winter","Spring"))+
-  #scale_color_brewer(palette = "Set2")+
+  scale_color_brewer(palette = "Set2")+
   scale_fill_brewer(palette = "Set3")+
   theme_bw()
 all_seasons_sl_boxplot
@@ -392,7 +392,7 @@ Here I begin the analysis of the shell length distribution to see if they're sig
 ```{r}
 #models
 SL_dis_mod <- kruskal.test(SL_mm~Season, data=size_dist_all_seasons)
-check_model(SL_dis_mod) #this disn't work, I got this error
+#check_model(SL_dis_mod) #this disn't work, I got this error
 #Error: `check_model()` returned following error: Can't extract variance-covariance matrix. `get_varcov()` returned following
   #error: no applicable method for 'vcov' applied to an object of class "htest"
   #If the error message does not help identifying your problem, another reason why `check_model()` failed might be that
@@ -534,72 +534,71 @@ all_seasons_abundance_plot
 
 # Linear models for Owl limpets Abundance per season
 ```{r, Linear models for Owl limpets Abundance per season}
+#linear_abundance <-master_sl %>%
+   #filter(Season!="Spring", 
+          #Date!="2023_12_10") %>%  #not including December
+   #group_by(Season, Plot_Name) %>% 
+   #count() 
 
-linear_abundance <-master_sl %>%
-   filter(Season!="Spring", #not including re-tagging event
-          Date!="2023_12_10")  %>% #not including December
-   group_by(Season, Plot_Name) %>% 
-   count() 
+#abun_mod <- kruskal.test(n~Season, data=linear_abundance)
+#dunnTest(n~Season,
+ #        linear_abundance,
+  #       method="bonferroni")
 
-abun_mod <- kruskal.test(n~Season, data=linear_abundance)
-dunnTest(n~Season,
-         linear_abundance,
-         method="bonferroni")
-
-shapiro.test(linear_abundance$abun)
+#shapiro.test(linear_abundance$abun)
 
 #mixed effects linear regressions
-mod_abundance_all_seasons <-lmer(n~Season+(1|Plot_Name), data = linear_abundance)
-check_model(mod_abundance_all_seasons)
-anova(mod_abundance_all_seasons)
-summary(mod_abundance_all_seasons)
+#mod_abundance_all_seasons <-lmer(n~Season+(1|Plot_Name), data = linear_abundance)
+#check_model(mod_abundance_all_seasons)
+#anova(mod_abundance_all_seasons)
+#summary(mod_abundance_all_seasons)
 
 #Post hoc tests
-emmeans(mod_abundance_all_seasons, list(pairwise~Season), adjust = "tukey")
+#emmeans(mod_abundance_all_seasons, list(pairwise~Season), adjust = "tukey")
 
 #using glmer because i am using transect as a random effect. I am using poisson distribution with log link because data is not normally distributed, even after transforming
 #glmm
-abun_per_seas_tran <-glmer(n~Season+(1|Plot_Name), data = linear_abundance,family = poisson(link = "log"))
-check_model(abun_per_seas_tran)
-anova(abun_per_seas_tran)
-summary(mod_abundance_all_seasons)
+#abun_per_seas_tran <-glmer(n~Season+(1|Plot_Name), data = linear_abundance,family = poisson(link = "log"))
+#check_model(abun_per_seas_tran)
+#anova(abun_per_seas_tran)
+#summary(mod_abundance_all_seasons)
 
 ```
 
 # Post Hoc test for Owl Limpet Abundance
 ```{r, Post Hoc test for Owl Limpet Abundance}
 #Post hoc test
-emmeans(abun_per_seas_tran, list(pairwise~Season), adjust = "tukey")
+#emmeans(abun_per_seas_tran, list(pairwise~Season), adjust = "tukey")
 ```
 
 
 # MANOVA or perMANOVA of Seasons x Shell Length, Density, Abundance
 ```{r, MANOVA}
+#FIX THIS CHUNK
+#average_data <-master_sl %>% 
+  #filter(Season!="Spring",
+        # Date!="2023_12_10") %>% 
+  #group_by(Season, Plot_Name)
 
-average_data <-master_sl %>% 
-  filter(Season!="Spring",
-         Date!="2023_12_10") %>% 
-  group_by(Season, Plot_Name)
-
-manova_data <-master_sl %>%
-   filter(Season!="Spring", #not including re-tagging event
-          Date!="2023_12_10") %>% #not including December
-   group_by(Season, Plot_Name)%>% 
-   count()%>%
-   mutate(limpet_density_m2 = n/20) %>% 
-  mutate(Plot = as.factor(Plot_Name)) %>% 
-  mutate(log_density = log(limpet_density_m2)) %>% 
-  ungroup() %>% 
-  group_by(Season) %>% 
-  mutate(abun = sum(n)) %>% 
-  ungroup() %>% 
-  group_by(Season, Plot_Name) %>% 
-  mutate(SL_avg = mean(average_data$SL_mm))
+#manova_data <-master_sl %>%
+   #filter(Season!="Spring", #not including re-tagging event
+          #Date!="2023_12_10") %>% #not including December
+   #group_by(Season, Plot_Name)%>% 
+   #count()%>%
+   #mutate(limpet_density_m2 = n/20) %>% 
+  #mutate(Plot = as.factor(Plot_Name)) %>% 
+  #mutate(log_density = log(limpet_density_m2)) %>% 
+  #ungroup() %>% 
+  #group_by(Season) %>% 
+  #mutate(abun = sum(n)) %>% 
+  #ungroup() %>% 
+  #group_by(Season, Plot_Name) %>% 
+  #mutate(SL_avg = mean(average_data$SL_mm))
   
   
-  left_join(size_dist_all_seasons, by="Plot_Name") %>% 
-  group_by(Season.x, Plot) %>% 
-  mutate(SL_avg = mean(SL_mm))
+  #left_join(size_dist_all_seasons, by="Plot_Name") %>% 
+  #group_by(Season.x, Plot) %>% 
+  #mutate(SL_avg = mean(SL_mm))
 
 
 ```
@@ -673,8 +672,8 @@ temperature_by_season <-master_temperature_data %>%
             max_temp = max(Temperature.C, na.rm = TRUE),
             min_temp = min(Temperature.C, na.rm = TRUE)) 
 
-ggplot(temperature_by_season, aes(x =date_col, y = Temperature.C))+
-  geom_line()+
-  geom_point(aes(color = Season))
+#ggplot(temperature_by_season, aes(x =date_col, y = Temperature.C))+
+  #geom_line()+
+  #geom_point(aes(color = Season))
 ```
 
