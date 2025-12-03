@@ -1,0 +1,192 @@
+---
+title: "Useful_Libs_and_Code"
+author: "Cindy Fajardo"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.path = "../Output/")
+```
+
+# Purpose
+This markdown is where all of the libraries and potential useful code lives. I have purged my master markdown for the first chapter of my thesis. But instead of deleting the lines of code, I will store them here to look at and cry later.
+
+```{r, Libraries}
+library("rerddap")
+library(tidyverse)
+library("tidync")
+library("doParallel")
+library(lubridate)
+library(patchwork)
+library(viridis)
+library(here)
+library(kableExtra)
+library(hrbrthemes)
+library(emmeans)
+library(agricolae)
+library(vegan)
+library(performance)
+library(broom)
+library(car)
+library(lme4)
+library(lmerTest)
+library(pscl)
+library(ggridges)
+library(devtools)
+#library(pairwiseAdonis)
+library(FSA)
+library(see)
+library(RColorBrewer)
+```
+
+# CSV's
+```{r, CSV's}
+master_sl <- read_csv(here("Data","Master_CNM_OL_SL_Data.csv")) %>%
+  filter(!Plot_Name %in% c("CNM_7", "CNM_8" )) %>% #filtered out transects not found in all seasons, do %in% to other lines
+mutate(sex=ifelse(SL_mm>= 50, "female", "male"))
+
+sess_percentcover <- read_csv(here("Data", "Master_CNM_Sessile_Percent_Data.csv")) %>%
+  filter(!Transect%in% c("CNM_7", "CNM_8")) #filtered out transects not found in all seasons
+
+mobiles_master <- read.csv(here("Data", "Master_CNM_Mobile_Data.csv")) %>%
+  filter(!Transect %in% c("CNM_7", "CNM_8")) #filtered out transects not found in all seasons
+
+mobiles_matrix_master <- read.csv(here("Data", "Master_CNM_Mobile_Matrix.csv")) %>%
+  filter(!Transect %in% c("CNM_7", "CNM_8")) #filtered out transects not found in all seasons
+
+sessile_matrix_master <- read.csv(here("Data", "Master_CNM_Sessile_Matrix.csv")) %>%
+  filter(!Transect %in% c("CNM_7", "CNM_8")) #filtered out transects not found in all seasons
+
+cabrillo_yearly_lim_size <- read_csv(here("Data", "yearly_lim_size.csv")) 
+
+master_temperature_data <- read.csv(here("Data", "Logger_CNM_2_2023_10_01__2024_06_10.csv"))
+```
+
+# Seasonal Growth Rates
+I'll start off with seasonal growth rates. Unfortunately, I continuously got negative rates, meaning there was some type of human error when measuring limpets shell length. But for transparency reasons, I will still show the data and the code.
+
+# Population Average Growth rate of Tagged Limpets from September to February
+```{r, Growth rate of Tagged Limpets from September to February}
+fall_win_growth_data_sex <- master_sl %>% #calling master shell length data
+  filter(Tag_ID != "0", #filtered out un-tagged limpets
+        Season %in% c("Winter", "Fall"),
+        Date != "2023_12_10") %>% #filtered out non-winter or non- fall data
+  mutate(Date = ymd(Date)) %>% #This will give me true date
+  group_by(sex, Tag_ID) %>% #grouped them by sex
+  reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Fall"])/(as.numeric(Date[Season == "Winter"]-Date[Season=="Fall"]))*30) %>%  #this is to get true growth rate using dates calculated from lubridate then mulitplied by 30 to get growth per month
+  #reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Fall"])/4.75) %>% 
+  left_join(master_sl %>% #this is to keep original length for fall
+              filter(Tag_ID!="0",
+                     Season=="Fall") %>% 
+              select(Tag_ID,SL_mm, Season))
+
+fall_win_growth_plot <- ggplot(fall_win_growth_data_sex, aes(x=SL_mm,
+                        y = limpet_growth,
+                        color = sex))+
+         geom_point()+ #to have continuous x and continuous y
+  labs(title = "Limpet Growth From September 2023-Februray 2024",
+       x = "Shell Length",
+       y = "Limpet Growth")+
+  theme_ipsum_pub()
+
+fall_win_growth_plot
+```
+
+# Population Average Growth rate of Tagged Limpets from February to June
+This does not include March re-tagging event. After I join the master back to the data frame, all of the males disappear. I'm not sure why.
+```{r, Population Average Growth rate of Tagged Limpets from February to June}
+win_spr_growth_data_sex <- master_sl %>%
+  filter(Tag_ID!="0",
+         Season %in% c("Late_Spring", "Winter"),
+         Date != "2023_12_10") %>% 
+  mutate(Date = ymd(Date)) %>% #This will give me true date
+  group_by(sex, Tag_ID) %>%
+  reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Late_Spring"])/(as.numeric(Date[Season == "Winter"]-Date[Season=="Late_Spring"]))*30) %>%  #this is to get true growth rate using dates calculated from lubridate then mulitplied by 30 to get growth per month
+  #reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Late_Spring"])/4.75) %>% #In this line of code all of the males disappear. I think this is happening because the tagged male limpets that were found were the ones tagged in the retagging event in early spring but the data is not being used. Only female tagged limpets that had been tagged in the original tagging even in September were found.
+  left_join(master_sl %>% 
+              filter(Tag_ID!="0",
+                     Season=="Late_Spring") %>% 
+              select(Tag_ID,SL_mm, Season)) #most values are negative
+
+win_spr_growth_plot <- ggplot(win_spr_growth_data_sex, aes(x=SL_mm,
+                        y = limpet_growth,
+                        color = sex))+
+         geom_point()+
+  labs(title = "Limpet Growth From February 2024-June 2024",
+       x = "Shell Length",
+       y = "Limpet Growth")+
+  theme_ipsum_pub()
+win_spr_growth_plot
+#all of the males disappear from the data because the males that were tagged in the Fall may have dissapeared, the tag fell off, or they moved to a location out of the transect or view. I'm considering looking at the "spring" data which is the re-tagging event that happened in March 2024.
+```
+
+# Complete Growth Data
+```{r, Complete Growth Data}
+complete_growth <- bind_rows(fall_win_growth_data_sex, win_spr_growth_data_sex)
+
+comp_growth_scatter <- complete_growth %>% 
+          filter(SL_mm > 50,
+                 SL_mm < 72) %>%
+  mutate(growth_zero = ifelse(limpet_growth<0, 0, limpet_growth)) %>% 
+          ggplot(aes(x = SL_mm,
+                   y = growth_zero))+
+  geom_point(aes(color = Season))+
+  geom_smooth(method = "glm", family = gaussian(link ="log")) #exponential decline
+              #formula = "y~I(log(x))") #this adds a quadratic function
+
+comp_growth_scatter
+
+```
+
+# ANCOVA For Growth Data
+```{r}
+complete_growth %>% 
+          filter(SL_mm > 50)
+comp_growth_mod <- lmer(limpet_growth~poly(SL_mm,2)*Season+(1|Tag_ID), data = complete_growth %>% #want to keep this
+          filter(SL_mm > 50,
+                 SL_mm < 72))
+check_model(comp_growth_mod)
+ggsave(here("Output", "Growth_Check_Model.png"))
+anova(comp_growth_mod)
+summary(comp_growth_mod)
+
+lm_growth <- lm(limpet_growth~poly(SL_mm,2)*Season, data = complete_growth %>% 
+          filter(SL_mm > 50))
+check_model(lm_growth)
+anova(lm_growth)
+```
+
+
+
+# Re-tagging event
+Here I am looking at data between the re-tagging event and the late spring data collection. I only did density this far that is why i am dividing n by 50 not twenty
+```{r, Look at later}
+#Density?
+Spring_Density_Data <- master_sl %>%
+  filter(!Season %in% c("Winter", "Fall"),
+         Date!="2023_12_10") %>% 
+   group_by(Season, Plot_Name)%>%
+   count()%>%
+   mutate(limpet_density_m2 = n/50)
+   
+winter_spring_dens_plot <- ggplot(Spring_Density_Data, 
+       aes(x=Plot_Name,
+           y=limpet_density_m2,
+           color=Season))+
+  geom_point()+
+  scale_color_brewer(palette = "Set1")
+winter_spring_dens_plot
+
+ 
+ # run model for dependent variable ~ independent, then for normality, etc, interpret model
+mod_density_winter_spring <-lm(limpet_density_m2~Season, data = Spring_Density_Data)
+check_model(mod_density_winter_spring)
+anova(mod_density_winter_spring) 
+summary(mod_density_winter_spring)
+
+```
+

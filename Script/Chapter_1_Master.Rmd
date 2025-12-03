@@ -81,129 +81,27 @@ master_temperature_data <- read.csv(here("Data", "Logger_CNM_2_2023_10_01__2024_
 
 ```
 
-# Seasonal Growth Rates
-I'll start off with seasonal growth rates. Unfortunately, I continuously got negative rates, meaning there was some type of human error when measuring limpets shell length. But for transparency reasons, I will still show the data and the code.
-
-# Population Average Growth rate of Tagged Limpets from September to February
-```{r, Growth rate of Tagged Limpets from September to February}
-fall_win_growth_data_sex <- master_sl %>% #calling master shell length data
-  filter(Tag_ID != "0", #filtered out un-tagged limpets
-        Season %in% c("Winter", "Fall"),
-        Date != "2023_12_10") %>% #filtered out non-winter or non- fall data
-  mutate(Date = ymd(Date)) %>% #This will give me true date
-  group_by(sex, Tag_ID) %>% #grouped them by sex
-  reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Fall"])/(as.numeric(Date[Season == "Winter"]-Date[Season=="Fall"]))*30) %>%  #this is to get true growth rate using dates calculated from lubridate then mulitplied by 30 to get growth per month
-  #reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Fall"])/4.75) %>% 
-  left_join(master_sl %>% #this is to keep original length for fall
-              filter(Tag_ID!="0",
-                     Season=="Fall") %>% 
-              select(Tag_ID,SL_mm, Season))
-
-fall_win_growth_plot <- ggplot(fall_win_growth_data_sex, aes(x=SL_mm,
-                        y = limpet_growth,
-                        color = sex))+
-         geom_point()+ #to have continuous x and continuous y
-  labs(title = "Limpet Growth From September 2023-Februray 2024",
-       x = "Shell Length",
-       y = "Limpet Growth")+
-  theme_ipsum_pub()
-
-fall_win_growth_plot
-```
-
-# Population Average Growth rate of Tagged Limpets from February to June
-This does not include March re-tagging event. After I join the master back to the data frame, all of the males disappear. I'm not sure why.
-```{r, Population Average Growth rate of Tagged Limpets from February to June}
-win_spr_growth_data_sex <- master_sl %>%
-  filter(Tag_ID!="0",
-         Season %in% c("Late_Spring", "Winter"),
-         Date != "2023_12_10") %>% 
-  mutate(Date = ymd(Date)) %>% #This will give me true date
-  group_by(sex, Tag_ID) %>%
-  reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Late_Spring"])/(as.numeric(Date[Season == "Winter"]-Date[Season=="Late_Spring"]))*30) %>%  #this is to get true growth rate using dates calculated from lubridate then mulitplied by 30 to get growth per month
-  #reframe(limpet_growth = (SL_mm[Season=="Winter"]-SL_mm[Season=="Late_Spring"])/4.75) %>% #In this line of code all of the males disappear. I think this is happening because the tagged male limpets that were found were the ones tagged in the retagging event in early spring but the data is not being used. Only female tagged limpets that had been tagged in the original tagging even in September were found.
-  left_join(master_sl %>% 
-              filter(Tag_ID!="0",
-                     Season=="Late_Spring") %>% 
-              select(Tag_ID,SL_mm, Season)) #most values are negative
-
-win_spr_growth_plot <- ggplot(win_spr_growth_data_sex, aes(x=SL_mm,
-                        y = limpet_growth,
-                        color = sex))+
-         geom_point()+
-  labs(title = "Limpet Growth From February 2024-June 2024",
-       x = "Shell Length",
-       y = "Limpet Growth")+
-  theme_ipsum_pub()
-win_spr_growth_plot
-#all of the males disappear from the data because the males that were tagged in the Fall may have dissapeared, the tag fell off, or they moved to a location out of the transect or view. I'm considering looking at the "spring" data which is the re-tagging event that happened in March 2024.
-```
 
 # Complete Growth Data
+I'm leaving this chunk in for reference to code with geom_smooth
 ```{r, Complete Growth Data}
-complete_growth <- bind_rows(fall_win_growth_data_sex, win_spr_growth_data_sex)
+#complete_growth <- bind_rows(fall_win_growth_data_sex, win_spr_growth_data_sex)
 
-comp_growth_scatter <- complete_growth %>% 
-          filter(SL_mm > 50,
-                 SL_mm < 72) %>%
-  mutate(growth_zero = ifelse(limpet_growth<0, 0, limpet_growth)) %>% 
-          ggplot(aes(x = SL_mm,
-                   y = growth_zero))+
-  geom_point(aes(color = Season))+
-  geom_smooth(method = "glm", family = gaussian(link ="log")) #exponential decline
+#comp_growth_scatter <- complete_growth %>% 
+          #filter(SL_mm > 50,
+                 #SL_mm < 72) %>%
+  #mutate(growth_zero = ifelse(limpet_growth<0, 0, limpet_growth)) %>% 
+          #ggplot(aes(x = SL_mm,
+                  # y = growth_zero))+
+  #geom_point(aes(color = Season))+
+  #geom_smooth(method = "glm", family = gaussian(link ="log")) #exponential decline
               #formula = "y~I(log(x))") #this adds a quadratic function
 
-comp_growth_scatter
+#comp_growth_scatter
 
 ```
 
-# ANCOVA For Growth Data
-```{r}
-complete_growth %>% 
-          filter(SL_mm > 50)
-comp_growth_mod <- lmer(limpet_growth~poly(SL_mm,2)*Season+(1|Tag_ID), data = complete_growth %>% #want to keep this
-          filter(SL_mm > 50,
-                 SL_mm < 72))
-check_model(comp_growth_mod)
-ggsave(here("Output", "Growth_Check_Model.png"))
-anova(comp_growth_mod)
-summary(comp_growth_mod)
 
-lm_growth <- lm(limpet_growth~poly(SL_mm,2)*Season, data = complete_growth %>% 
-          filter(SL_mm > 50))
-check_model(lm_growth)
-anova(lm_growth)
-```
-
-
-
-# Re-tagging event
-Here I am looking at data between the re-tagging event and the late spring data collection. I only did density this far that is why i am dividing n by 50 not twenty
-```{r, Look at later}
-#Density?
-Spring_Density_Data <- master_sl %>%
-  filter(!Season %in% c("Winter", "Fall"),
-         Date!="2023_12_10") %>% 
-   group_by(Season, Plot_Name)%>%
-   count()%>%
-   mutate(limpet_density_m2 = n/50)
-   
-winter_spring_dens_plot <- ggplot(Spring_Density_Data, 
-       aes(x=Plot_Name,
-           y=limpet_density_m2,
-           color=Season))+
-  geom_point()+
-  scale_color_brewer(palette = "Set1")
-winter_spring_dens_plot
-
- 
- # run model for dependent variable ~ independent, then for normality, etc, interpret model
-mod_density_winter_spring <-lm(limpet_density_m2~Season, data = Spring_Density_Data)
-check_model(mod_density_winter_spring)
-anova(mod_density_winter_spring) 
-summary(mod_density_winter_spring)
-
-```
 
 # Seasonal Population Distribution
 In this section, I will start the seasonal population distribution
@@ -307,7 +205,7 @@ spring_pop_density <- Spring_data %>% #calling df with shell length data
         axis.text.y = element_blank())+
   scale_x_continuous(limits = c(0,90))+
   scale_y_continuous(limits = c(0,220))+
-  geom_vline(xintercept = mean(Spring_data$SL_mm),
+  geom_vline(xintercept = median(Spring_data$SL_mm),
              colour="green")+ #draw line where average lies on density
   theme_bw()+
   facet_wrap(~Plot_Name)
@@ -327,6 +225,28 @@ size_dist_all_seasons <-master_sl %>%
 #summary(anova_results)
 #anova(anova_results)
 
+#this a histogram with all of the shell lengths recorded for all three seasons
+all_seas_hist <- size_dist_all_seasons %>% #calling df with shell length data
+  ggplot( aes(x=SL_mm)) + #Sl on x, I am not selecting y so R can use limpet count for density plot
+  geom_histogram(fill="orange",#color of bars
+           colour="black",#color of bar outline
+           alpha= 1,#transparency of bar
+           binwidth = 1) + #size of bars
+  labs(title = "Shell Length Distribution September 23-June 24",
+       x = "Shell Length (mm)",
+       y = "Owl Limpet Count")+
+  theme(axis.title.y = element_blank(),
+        axis.title.x = element_text(size = 10),
+        axis.text.x = element_text(size = 9),
+        axis.text.y = element_blank())+
+  scale_x_continuous(limits = c(0,90))+
+  scale_y_continuous(limits = c(0,220))+
+  geom_vline(xintercept = median(Spring_data$SL_mm),
+             colour="green")+ #draw line where average lies on density
+  theme_bw()#+
+  #facet_wrap(~Plot_Name)
+ #spring_pop_density
+all_seas_hist
 
 all_seasons_sl_boxplot <- ggplot(size_dist_all_seasons,
                                    aes(x=Season,
@@ -363,10 +283,10 @@ sl_med_SE <- ggplot(shell_lenght_stats_per_seas,
                     aes(x = Seasons,
                         y = med_sl))+
   geom_point(show.legend = FALSE,
-             size = 5)+
+             size = 5)+ #this adds the point where the median is 
   geom_errorbar(aes(ymin = mean_sl - sd_sl, ymax = mean_sl + sd_sl),
                    width = 0.2,
-                show.legend = FALSE)+ 
+                show.legend = FALSE)+ #this add the error line which is the mean of the shell length +/- the standard deviation
   geom_jitter(data = size_dist_all_seasons,
               aes(x = Season,
                   y = SL_mm),
@@ -427,23 +347,44 @@ anova(sl_glm)
 summary(sl_glm)
 
 
-
-
-
-#####################
-scatter_full <- ggplot(size_dist_all_seasons,
-                       aes(x=Season,
-                           y=SL_mm))+
-  geom_point()+
-  geom_smooth(method="lm")+
-  facet_wrap(~Season)#regression line, add method = lm 
-scatter_full
 ```
 
 # Post_hoc test for Shell Length Distributions
 ```{r, Post_hoc test for Shell Length Distributions}
 #Post hoc tests
 emmeans(sl_glm, list(pairwise~Season), adjust = "tukey")
+```
+
+# Big or Small Limpets For All Seasons and Individual Seasons
+```{r, Big or Small Limpets For All Seasons and Individual Seasons}
+big_small_for_all_seasons <- master_sl %>%
+  filter(Season!="Spring",
+         Date!="2023_12_10") %>% 
+  mutate(Big_small=ifelse(SL_mm>= 32, "big", "small"))
+
+all_seas_big_small_density_plot <- ggplot(big_small_for_all_seasons,
+                                   aes(x=Big_small,
+                                       y=SL_mm,
+                                       fill = Big_small))+
+  geom_boxplot(show.legend = FALSE)+
+  scale_fill_brewer(palette = "Dark2")+
+  theme_bw()+
+  theme(axis.text.x = element_text(size = 15),
+        axis.title.x = element_text(size = 18, face = "bold"),
+       axis.title.y = element_text(size = 15, face = "bold"))+
+  facet_wrap(~Season)
+  
+all_seas_big_small_density_plot
+
+only_smalls <- big_small_for_all_seasons %>% 
+  filter(Big_small!="big")
+
+only_smalls_boxplot <- ggplot(only_smalls,
+                              aes(x=Season,
+                                  y = SL_mm,
+                                  fill = Season))+
+  geom_boxplot()
+only_smalls_boxplot
 ```
 
 
@@ -488,7 +429,7 @@ anova(mod_density_all_seasons)
 summary(mod_density_all_seasons)
 
 
-#i'm going to stick to the generalized mixed effects model because the data is not normally distributed.
+#i'm going to stick to the generalized mixed effects model because the data is not normally distributed and the data is continous.
 #glmm
 density_glmm <- glmer(limpet_density_m2 ~ Season + (1 |Plot), 
                     data = all_seasons_Density_Data, 
@@ -639,13 +580,17 @@ dip_CNM_ZThree_per_year_data %>%
 ```{r, Mobile Data Manipulation}
 #lets start with manipulating mobile data. I need to make the mobile data sheet long and add another column specifying the functionality of the mobile organism (herbivore, carnivore)
 
+#When after mutating the sum the number of individuals, I get a new row called spec_sum which gives me the total number of individuals of all species into one column/transect. For instance, in plot name CNM_1_C_5, spec_sum adds all of the number across that row, so the sum is 2. If I pivot longer, species sum, which corresponds to one transect on either a yes or no plot, shows up often making it difficult to visualize. I might need to sperate the data by seasons to view the species sum by transect
+
 long_mobiles <- mobiles_master %>% 
+  group_by(Season) %>% 
+  mutate(spec_sum = rowSums(across(c(M_lugubris, L_hartwegii, L_dentiens, L_plena, L_keenae, L_limatula, L_scabra, Nuttallina_sp, Mopalia_sp, P_crassipes, T_eiseni, T_funebralis, T_gallina, L_gigantea)), na.rm=TRUE)) %>% 
   pivot_longer(cols = M_lugubris:L_gigantea,
                names_to = "species",
                values_to = "count") %>% 
   mutate(species = as.factor(species)) %>% 
   mutate(functionality = case_when(
-  species %in% "M_lugubris" ~ "predator",
+  species %in% "M_lugubris" ~ "carnivore",
   species %in% "L_hartwegii" ~ "macrograzer",
   species %in%  "L_dentiens" ~ "macrograzer",
   species %in%  "L_plena" ~ "mesograzer",
@@ -663,17 +608,58 @@ long_mobiles <- mobiles_master %>%
 
 ```
 
-# Temperature Data
-```{r, Temperature data}
-temperature_by_season <-master_temperature_data %>% 
-  group_by(Season)%>% 
-  separate(Date_Time, into = c("date_col", "time_col"), sep = " ", remove = FALSE) %>% 
-  summarise(mean_temp = mean(Temperature.C, na.rm = TRUE),
-            max_temp = max(Temperature.C, na.rm = TRUE),
-            min_temp = min(Temperature.C, na.rm = TRUE)) 
+# Trophic Type Graph
+```{r, Trophic Type Graph}
+trophic_type_mobiles <- long_mobiles %>% 
+  ggplot(aes(x = Season,
+             y= count,
+             fill = functionality)) +
+  geom_bar(position="fill", stat="identity")+
+  theme()+
+  facet_wrap(~COL_pres)
+trophic_type_mobiles
+```
 
-#ggplot(temperature_by_season, aes(x =date_col, y = Temperature.C))+
-  #geom_line()+
-  #geom_point(aes(color = Season))
+# By species graph
+```{r, By species graph}
+by_species_mobiles <- long_mobiles %>% 
+  ggplot(aes(x = Season,
+             y = count,
+             fill = species)) +
+  geom_bar(position="fill", stat="identity")+
+  scale_fill_viridis_d(option = "H")+ #i like this graph but look for better fill colors
+  theme()+
+  facet_wrap(~COL_pres)
+by_species_mobiles
+#axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1
+```
+
+# Small owl Limpets Present in Presence of Large Owl Limpet
+```{r, Small owl Limpets Present in Presence of Large Owl Limpet}
+smalls_with_big <- long_mobiles %>% 
+  filter(species=="L_gigantea")
+
+small_with_big_boxplot <- ggplot(smalls_with_big,
+                                 aes(x=Season,
+                                     y= count,
+                                     fill = COL_pres))+
+  geom_boxplot()
+small_with_big_boxplot 
+```
+
+
+# Temperature Data
+I need to work out this chunck
+```{r, Temperature data}
+#temperature_by_season <-master_temperature_data %>% 
+  #group_by(Season)%>% 
+  #separate(Date_Time, into = c("date_col", "time_col"), sep = " ", remove = FALSE) %>% 
+  #summarise(mean_temp = mean(Temperature.C, na.rm = TRUE),
+           # max_temp = max(Temperature.C, na.rm = TRUE),
+            #min_temp = min(Temperature.C, na.rm = TRUE)) 
+
+#ggplot(temperature_by_season, aes(x =Season, y = ))+
+ # geom_line()+
+ # geom_point(aes(color = Season))
 ```
 
