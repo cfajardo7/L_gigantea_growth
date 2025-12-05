@@ -608,15 +608,47 @@ long_mobiles <- mobiles_master %>%
 
 ```
 
+# Summary of mobiles
+```{r, Summary of mobiles}
+summary_mobiles <- long_mobiles %>% 
+  mutate(log_count = log(count+1)) %>% 
+  group_by(functionality, Season, COL_pres) %>% 
+  summarize(mean_count = mean(log_count, na.rm = TRUE),
+          se_count = sd(log_count, na.rm = TRUE)/sqrt(n()))
+summary_mobiles
+
+summary_plot <- summary_mobiles %>% 
+  ggplot(aes(x = COL_pres,
+             y = mean_count,
+             color = functionality))+
+  geom_point(position = position_dodge(width = 0.3))+ #this code helps spread apart the error bars
+  geom_errorbar(aes(ymin=mean_count-se_count, ymax=mean_count+se_count),
+               width = 0.1,
+               position = position_dodge(width = 0.3))+ #this code helps spread apart the error bars
+  facet_wrap(~Season)
+summary_plot
+```
+
+# linear models with random effect per function
+```{r, linear models per funtion}
+meso_lm <- lmer(log(count+1)~COL_pres+(1|Transect),
+                data = long_mobiles %>% 
+                  filter(functionality == "mesograzer",
+                         Season == "Spring"))
+check_model(meso_lm)
+anova(meso_lm)
+
+```
+
 # Trophic Type Graph
 ```{r, Trophic Type Graph}
 trophic_type_mobiles <- long_mobiles %>% 
-  ggplot(aes(x = Season,
+  ggplot(aes(x = COL_pres,
              y= count,
-             fill = functionality)) +
-  geom_bar(position="fill", stat="identity")+
+             color = functionality)) +
+  geom_point()+
   theme()+
-  facet_wrap(~COL_pres)
+  facet_wrap(~Season)
 trophic_type_mobiles
 ```
 
