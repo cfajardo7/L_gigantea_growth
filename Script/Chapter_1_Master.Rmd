@@ -633,11 +633,115 @@ summary_plot
 ```{r, linear models per funtion}
 meso_lm <- lmer(log(count+1)~COL_pres+(1|Transect),
                 data = long_mobiles %>% 
-                  filter(functionality == "mesograzer",
-                         Season == "Spring"))
+                  filter(functionality == "mesograzer", #change function
+                         Season == "Spring")) #change season
 check_model(meso_lm)
+ggsave(here("Output", "meso_lm_Check_Model.png"))
 anova(meso_lm)
+#When Nyssa and I ran the mixed effects model with season as an interaction term, seasonality was so strong that if there was any effect by COL_pres it is not noticeable. So we took out season as an interaction, and filter out each season and look at the results. These are the results:
+    #function mesograzer
+        #Season: Fall
+            #-residuals not normal, p= 0.001
+        #Season: Winter
+            #residuals not normal, p= 0.81
+        #Season: Spring
+            #residuals not normal, p= 0.25
+            #Residuals are not normal. Will run glmer, family poisson, log link
 
+macro_lm <- lmer(log(count+1)~COL_pres+(1|Transect),
+                data = long_mobiles %>% 
+                  filter(functionality == "macrograzer", #change function
+                         Season == "Spring")) #change season
+check_model(macro_lm)
+ggsave(here("Output", "macro_lm_check_model.png"))
+anova(macro_lm)
+#I ran the mixed effects model with season as an interaction term, seasonality was so strong that if there was any effect by COL_pres it is not noticeable. Took out season as an interaction, and filter out each season and look at the results. These are the results:
+    #function macrograzer
+        #Season: Fall
+            #-residuals not normal, p= 0.86
+        #Season: Winter
+            #residuals not normal, p= 0.017
+        #Season: Spring
+            #residuals not normal, p= 0.42
+            #Residuals are not normal. Will run glmer, family poisson, log link
+
+carn_lm <- lmer(log(count+1)~COL_pres+(1|Transect),
+                data = long_mobiles %>% 
+                  filter(functionality == "carnivore", #change function
+                         Season == "Spring")) #change season
+check_model(carn_lm)
+ggsave(here("Output", "carn_lm_Check_Model.png"))
+anova(carn_lm)
+#I ran the mixed effects model with season as an interaction term, seasonality was so strong that if there was any effect by COL_pres it is not noticeable. Took out season as an interaction, and filter out each season and look at the results. These are the results:
+    #function carnivore
+        #Season: Fall
+            #-residuals not normal, p= 0.12
+        #Season: Winter
+            #residuals not normal, p= 0.98
+        #Season: Spring
+            #residuals not normal, p= 0.67
+            #Residuals are not normal. Will run glmer, family poisson, log link
+```
+# Generalized Linear Model Per Function, poisson log link
+```{r, Generalized Linear Model Per Function, poisson}
+meso_glmm <- glmer((count+1)~COL_pres*Season+(1|Transect),
+                data = long_mobiles, 
+                family = poisson(link = "log")) #%>% 
+                  #filter(functionality == "mesograzer")) #change function
+check_model(meso_glmm)
+ggsave(here("Output", "glmm_func_cm.png"))
+anova(meso_glmm)
+summary(meso_glmm)
+```
+
+
+# Types of grazers
+```{r, Types of grazers}
+grazers_types <- long_mobiles %>% 
+  filter(functionality == "macrograzer"|functionality == "mesograzer")%>% #using | helps filter out two types of variables in the same column
+  mutate(grazer_type = case_when(
+  species %in% "L_hartwegii" ~ "chiton",
+  species %in%  "L_dentiens" ~ "chiton",
+  species %in%  "L_plena" ~ "littorine",
+  species %in%  "L_keenae" ~ "littorine",
+  species %in%  "L_limatula" ~ "limpet",
+  species %in%  "L_scabra" ~ "limpet",
+  species %in%  "Nuttallina_sp" ~ "chiton",
+  species %in%  "Mopalia_sp" ~ "chiton",
+  species %in%  "T_eiseni" ~ "tegula_snail",
+  species %in%  "T_funebralis" ~ "tegula_snail",
+  species %in%  "T_gallina" ~ "tegula_snail",
+  species %in%  "L_gigantea" ~ "limpet"))
+```
+
+# Summary and Visual of Grazer Type
+```{r}
+summary_grazers <- grazers_types %>% 
+  mutate(log_count = log(count+1)) %>% 
+  group_by(grazer_type, Season, COL_pres) %>% 
+  summarize(mean_count = mean(log_count, na.rm = TRUE),
+          se_count = sd(log_count, na.rm = TRUE)/sqrt(n()))
+
+grazer_summary_plot <- summary_grazers %>% 
+  ggplot(aes(x = COL_pres,
+             y = mean_count,
+             color = grazer_type))+
+  geom_point(position = position_dodge(width = 0.3))+ #this code helps spread apart the error bars
+  geom_errorbar(aes(ymin=mean_count-se_count, ymax=mean_count+se_count),
+               width = 0.1,
+               position = position_dodge(width = 0.3))+ #this code helps spread apart the error bars
+  facet_wrap(~Season)
+grazer_summary_plot
+```
+
+# Linear Models for Grazer Type
+```{r, Linear Models for Grazer Type}
+limpet_lm <- lmer(log(count+1)~COL_pres*Season+(1|Transect),
+                data = grazers_types %>% 
+                  filter(grazer_type == "limpet")) #change type
+                        
+check_model(limpet_lm) #when I run the check function, I'm having a hard time seeing it
+anova(limpet_lm)
 ```
 
 # Trophic Type Graph
@@ -651,6 +755,7 @@ trophic_type_mobiles <- long_mobiles %>%
   facet_wrap(~Season)
 trophic_type_mobiles
 ```
+
 
 # By species graph
 ```{r, By species graph}
