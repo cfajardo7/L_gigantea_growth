@@ -1,0 +1,864 @@
+---
+title: "Cabrillo National Monument: Owl limpet seasonality and community effects"
+subtitle: "A mix of univariate of multivariate statistics to test seasonality in both limpet size/density and community responses"
+author: "Nyssa/Cindy"
+date: "`r format(Sys.Date(), '%Y-%m-%d')`"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    theme: cosmo
+    code-fold: show
+    code-tools: true
+    df-print: paged
+execute:
+  warning: false
+  message: false
+  cache: false
+
+---
+
+## Overview
+
+This Quarto notebook analyzes three datasets from **Cabrillo National Monument (San Diego, CA)** to answer:
+
+1. **Seasonality in owl limpets (*Lottia gigantea*)**
+   - Does **density** change by **Season**?
+   - Does **size** (shell length, `SL_mm`) change by **Season**?
+
+2. **Community consequences of limpet presence**
+   - Does **owl limpet presence** (`COL_pres`) affect:
+     - **Mobile invertebrate composition** (counts)?
+     - **Sessile cover composition** (% cover / proportional cover)?
+   - Are there **interactions with Season**?
+
+### Design assumptions and why they matter 
+
+- The datasets include repeated sampling across **Transects** and/or **Plots**, so we:
+  - use **mixed models** with **random intercepts** for spatial sampling units (e.g., `Transect`, or `Plot_Name`),
+  - and constrain permutations by transect for multivariate tests.
+
+- **Density**:
+  - The transect size was **50 m²** so I divided the counts by this value to get density per transect .
+
+- **Community data**:
+  - Mobile inverts are **counts** (often overdispersed, zero-inflated).
+  - Sessile “percent cover” is stored as **proportions** (0–1) in this dataset; we still treat it as compositional.
+
+---
+
+## Packages and helpers
+
+```{r}
+# Core
+library(tidyverse)
+library(janitor)     # to clean the names for consistency
+
+# Mixed models
+library(glmmTMB)     # flexible GLMMs (NB, Gamma, etc.)
+library(lme4)        # LMMs (fallback)
+library(emmeans)     # estimated marginal means / contrasts
+
+# Diagnostics
+library(DHARMa)      # residual simulation diagnostics for GLMMs
+library(performance) # assumption checks / R2 / collinearity
+library(broom.mixed) # tidy() for mixed models
+
+# Multivariate community ecology
+library(vegan)       # adonis2, metaMDS, betadisper, envfit
+library(pairwiseAdonis) # optional; pairwise PERMANOVA if needed
+
+# Figures
+library(ggdist)      # raincloud/half-eye
+library(patchwork)   # figure layouts
+library(scales)      # label_percent etc.
+library(ggrepel)
+
+
+# A consistent plotting theme for a paper
+theme_set(
+  theme_classic(base_size = 14) + # base size text is 14
+    theme(
+      panel.grid = element_blank(),
+      axis.title = element_text(face = "bold"),
+      legend.title = element_text(face = "bold")
+    )
+)
+
+# Helper: safe logit transform for proportions in [0,1]
+# (useful for cover variables with 0s and 1s)
+logit01 <- function(p, eps = 1e-4) {
+  p2 <- pmin(pmax(p, eps), 1 - eps)
+  qlogis(p2)
+}
+```
+
+---
+
+## Import data
+
+> **Paths** assume the files are in the same folder as this Quarto file, or are in the working directory.
+> When you move this notebook to the scripts folder and the data files into your data folder, update paths below. 
+> Note, I edited these files to remove the transects removed in your other script and to just bring in the normalized community composition data
+
+```{r}
+# File paths (edit if needed)
+path_size   <- "limpet_size.csv"
+path_mobile <- "mobile_counts.csv"
+path_sess   <- "sessile_percent_cover.csv"
+
+limpet_size_raw <- read_csv(path_size, show_col_types = FALSE) %>% clean_names() %>%
+  mutate(season = ifelse(season == "Late_Spring", "Spring", season)) # for some reason the season is named Late spring here, but spring everywhere else
+mobile_raw      <- read_csv(path_mobile, show_col_types = FALSE) %>% clean_names()
+sessile_raw     <- read_csv(path_sess, show_col_types = FALSE) %>% clean_names()
+
+glimpse(limpet_size_raw)
+glimpse(mobile_raw)
+glimpse(sessile_raw)
+
+# to standardize the colors throughout the manuscript
+season_colors <- c( 
+  Winter = "#1F4E79",
+  Spring = "#2E8B57",
+  Fall   = "#C65D2E"
+)
+
+```
+
+---
+
+## Data cleaning and harmonization
+
+We standardize:
+- `season` as an **ordered factor**
+- `date` as a real date (best-effort parse for differences across datasets)
+- `col_pres` to **Yes/No** factor
+- key grouping variables (`transect`, `plot_name`, etc.)
+
+```{r}
+# Season order 
+season_levels <- c("Winter","Spring","Summer","Fall") # change this order to change order of the plots
+
+# Limpet size dataset
+limpet_size <- limpet_size_raw %>%
+  mutate(
+    season = factor(season, levels = season_levels),
+    # Dataset stores date as "YYYY_MM_DD" strings (e.g., 2023_09_29)
+    date = parse_date_time(date, orders = c("Y_m_d", "Y_m", "Y-m-d", "Y/m/d")) %>% as_date(),
+    plot_name = as.factor(plot_name),
+    plot_side = as.factor(plot_side),
+    sl_mm = as.numeric(sl_mm)
+  ) %>%
+  filter(!is.na(season), !is.na(sl_mm)) # remove the rows with NAs in length or season
+
+# Mobile invertebrate counts
+mobile <- mobile_raw %>%
+  mutate(
+    season = factor(season, levels = season_levels),
+    date = parse_date_time(date, orders = c("Y_m_d", "Y_m", "Y-m-d", "Y/m/d")) %>% as_date(),
+    transect = as.factor(transect),
+    plot_name = as.factor(plot_name),
+    col_pres = case_when(
+      tolower(col_pres) %in% c("y","yes","true","t","1") ~ "Yes",
+      tolower(col_pres) %in% c("n","no","false","f","0") ~ "No",
+      TRUE ~ NA_character_
+    ) %>% factor(levels = c("No","Yes"))
+  )
+
+# Sessile percent cover (in this file, cover columns appear to be proportions already: 0–1)
+sessile <- sessile_raw %>%
+  mutate(
+    season = factor(season, levels = season_levels),
+    date = parse_date_time(date, orders = c("Y_m_d", "Y_m", "Y-m-d", "Y/m/d")) %>% as_date(),
+    transect = as.factor(transect),
+    plot_name = as.factor(plot_name),
+    col_pres = case_when(
+      tolower(col_pres) %in% c("y","yes","true","t","1") ~ "Yes",
+      tolower(col_pres) %in% c("n","no","false","f","0") ~ "No",
+      TRUE ~ NA_character_
+    ) %>% factor(levels = c("No","Yes"))
+  )
+
+# Quick checks
+limpet_size %>% count(season)
+mobile %>% count(season, col_pres) 
+sessile %>% count(season, col_pres) ## looks like there are missing pairs of col present
+```
+
+---
+
+## Question 1: Do limpet density and size change by season?
+
+### 1A. Density (true density; transect area = 50 m²)
+
+You specified that each limpet-density sampling unit corresponds to a **50 m² transect**.
+We therefore compute:
+
+- `n_limpets` = number of limpets observed in a sampling unit
+- `density_m2` = `n_limpets / 50`
+
+```{r}
+limpet_density <- limpet_size %>%
+  group_by(season, date, plot_name) %>%
+  summarise(
+    n_limpets = n(),# count all the limpets
+    # True density (per m²) using known transect area
+    area_m2 = 50, ## double check this is correct. How long was the transect and how many meters on either size of the transect did you go? 
+    density_m2 = n_limpets / area_m2,
+    mean_sl = mean(sl_mm, na.rm = TRUE), # mean size per transect
+    sd_sl = sd(sl_mm, na.rm = TRUE), # standard deviation in size per transect
+    .groups = "drop" # drop the groupings
+  )
+
+limpet_density %>% glimpse()
+```
+
+#### Exploratory plot (density by season)
+
+```{r}
+p_density <- limpet_density %>%
+  ggplot(aes(x = season, y = density_m2, color = season)) +
+  ggdist::stat_halfeye(aes(x = season, y = density_m2, fill = season),adjust = 0.7, width = 0.6, justification = -0.15) +
+  geom_boxplot(width = 0.18, outlier.shape = NA) + ## this removes the outliers from the boxplot-- only OK because I also have the stat_halfeye and the jitter
+  geom_jitter(width = 0.08, height = 0, alpha = 0.35) +
+  labs(x = NULL, y = "Owl limpet density (individuals m⁻²)"
+       #title = "Seasonal variation in owl limpet density"
+       ) +
+  scale_color_manual(values = season_colors)+
+  scale_fill_manual(values = season_colors)+
+  scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
+  theme(legend.position = "none")
+
+p_density
+```
+
+#### Model: negative binomial GLMM (random effects for plot)
+
+Counts are typically overdispersed; negative binomial is usually appropriate.
+
+```{r}
+m_density <- glmmTMB(
+  # Model counts because negative binomial requires count data with an offset for sampled area to estimate density
+  n_limpets ~ season + offset(log(area_m2)) + (1 | plot_name),
+  family = nbinom2(),
+  data = limpet_density
+)
+
+summary(m_density)
+performance::check_overdispersion(m_density)
+performance::check_zeroinflation(m_density)
+```
+
+##### Diagnostics (DHARMa)
+
+```{r}
+sim_density <- DHARMa::simulateResiduals(m_density, n = 1000)
+plot(sim_density)
+DHARMa::testDispersion(sim_density)
+DHARMa::testZeroInflation(sim_density)
+```
+
+##### Effect sizes: estimated marginal means and contrasts
+
+```{r}
+emm_density <- emmeans(m_density, ~ season, type = "response")
+# With the area offset, 'response' is on the expected count scale; divide by area to report density
+
+emm_density
+
+pairs(emm_density, adjust = "tukey") 
+```
+
+##### Figure showing the actual model results: model-based means with uncertainty
+
+```{r}
+df_density_emm <- as.data.frame(emm_density) %>%
+  mutate(
+    area_m2 = 50,
+    density = response / area_m2,
+    density_lower = asymp.LCL / area_m2,
+    density_upper = asymp.UCL / area_m2
+  )
+
+# Note add in stars or letters or brackets based on significance testing from the emmeans
+p_density_emm <- ggplot(df_density_emm, aes(x = season, y = density)) +
+  geom_jitter(data = limpet_density, aes(x = season, y = density_m2), 
+              alpha = 0.5, width = 0.1)+
+  geom_point(size = 4) +
+  geom_errorbar(aes(ymin = density_lower, ymax = density_upper), width = 0.12) +
+  labs(x = NULL, y = "Estimated owl limpet density (individuals m⁻²)",
+       title = "Seasonal effect on owl limpet density (model-based NB-GLMM with area offset)") +
+  scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))
+
+p_density_emm
+```
+
+---
+
+### 1B. Size (`sl_mm`) by season
+
+Because `sl_mm` is continuous and strictly positive, we typically choose either:
+- **Gamma GLMM** or **Tweedie GLMM** with log link, or
+- **LMM** on log-transformed sizes.
+
+Here, we start with **Gamma GLMM** and fallback if needed.
+The **Gamma** was not a good fit so I went to *Tweedie* which was better but still not great. Keep looking.... the bimodal sizes makes this harder
+
+```{r}
+p_size <- limpet_size %>%
+  ggplot(aes(x = season, y = sl_mm, color = season)) +
+  ggdist::stat_halfeye(adjust = 0.7, width = 0.6, justification = -0.15, aes(fill = season)) +
+  geom_boxplot(width = 0.18, outlier.shape = NA) +
+  geom_jitter(width = 0.08, height = 0, alpha = 0.20, size = 0.8) +
+  labs(x = NULL, y = "Shell length (mm)"
+       #title = "Owl limpet size distribution by season"
+       ) +
+  scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
+   scale_color_manual(values = season_colors)+
+  scale_fill_manual(values = season_colors)+
+  theme(legend.position = "none")
+
+
+p_size
+```
+
+#### Gamma  or Tweedie GLMM with random effects for plot
+
+```{r}
+m_size_gamma <- glmmTMB(
+  sl_mm ~ season + (1 | plot_name),
+  dispformula = ~ season,  # Model dispersion as a function of season because unequal variances
+  family = tweedie(link = "log"), # better but still not the best, but I trust more this model
+  data = limpet_size
+)
+
+summary(m_size_gamma)
+```
+
+##### Diagnostics
+
+```{r}
+sim_size <- DHARMa::simulateResiduals(m_size_gamma, n = 1000)
+plot(sim_size)
+DHARMa::testDispersion(sim_size)
+```
+
+##### Estimated marginal means (back-transformed to mm)
+
+```{r}
+emm_size <- emmeans(m_size_gamma, ~ season, type = "response")
+emm_size
+pairs(emm_size, adjust = "tukey")
+```
+
+##### Figure: model-based seasonal means
+
+```{r}
+df_size_emm <- as.data.frame(emm_size)
+
+p_size_emm <- ggplot(df_size_emm, aes(x = season, y = response)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.12) +
+  labs(x = NULL, y = "Estimated mean shell length (mm)",
+       #title = "Seasonal effect on owl limpet size (Gamma GLMM)"
+       ) +
+  scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))
+
+p_size_emm
+```
+
+#### Different kind of visual to look at size structure shifts (CDFs)
+
+Cumulative distributions are great for communicating shifts in size structure (e.g., truncation).
+
+You would interprethis this plot byt saying: “For each season, what fraction of limpets are smaller than a given shell length?” 
+
+Example interpretations of the plot
+
+Steeper ECDF at small sizes in Spring
+→ Maybe recent recruitment or better post-settlement survival
+
+Right-shifted ECDF in Fall/Summer 
+→ growth of survivors after spring recruitment?
+
+These patterns often cannot be detected by mean-based models alone.
+
+“We visualized seasonal shifts in owl limpet size structure using empirical cumulative distribution functions (ECDFs), which depict the proportion of individuals that are smaller than a given shell length without assuming an underlying distribution.”
+```{r}
+p_cdf <- limpet_size %>%
+  ggplot(aes(x = sl_mm, color = season)) +
+  stat_ecdf(linewidth = 1) +
+  scale_color_manual(values = season_colors)+
+  labs(x = "Shell length (mm)", y = "Empirical CDF",
+       #title = "Seasonal shifts in size structure (ECDF)"
+       ) +
+  theme(legend.position = "none")
+
+p_cdf
+```
+
+---
+
+You would start with the mean values that you get from the emmeans output of the size model, state if there are any differences and then interpretit this model. The empirical cumulative distribution functions (ECDFs) showed  seasonal differences in size structure beyond mean responses. For a given shell length, the proportion of individuals by size differed among seasons, indicating seasonal shifts in the relative abundance of small versus large individuals. In particular, Spring exhibited a higher proportion of small individuals across much of the size range, whereas Fall and Winter showed a right-shifted distribution consistent with a greater representation of larger individuals.
+
+
+```{r}
+#| fig-width: 14
+#| fig-height: 6
+## Bring the figures together for pub quality
+## Add in stars with brackes to show significance between seasons based on emmeans
+(p_density|p_size|p_cdf)+plot_annotation(tag_levels = "a")
+ggsave(filename = "figure1.png", width = 14, height = 6)
+
+```
+## Question 2: Does limpet presence affect community composition, and does it interact with season?
+
+We analyze both:
+- **Mobile invertebrate counts** (multivariate & univariate)
+- **Sessile cover composition** (multivariate & univariate) --  I am having a hard time with the sessile data. Seems like everything is mostly bare rock and I am not sure what the microalgae are here
+
+Key fixed effects:
+- `col_pres` (No vs Yes)
+- `season`
+- `col_pres * season` interaction
+
+Random/blocking structure:
+- `transect` is used for random effects and permutation strata (to respect spatial non-independence).
+
+---
+
+
+## 2A. Mobile invertebrates (counts)
+
+### Identify species columns
+
+```{r}
+# group by species groups first
+
+mobile_grouped<-mobile %>%
+  mutate(Limpets = rowSums(across(c(l_limatula, l_scabra, l_gigantea))),
+         Chitons = rowSums(across(c(nuttallina_sp, mopalia_sp, l_hartwegii,l_dentiens))),
+         Turbans = rowSums(across(c(t_eiseni:t_gallina))),
+         Periwinkles = rowSums(across(c(l_plena, l_keenae))),
+         Whelks = m_lugubris) %>%
+  select(-c(m_lugubris:l_gigantea))
+
+# metadata
+mobile_meta <- c("season","date","transect","plot_name","l_r","meter_no","col_pres","t_f","tag_id")
+mobile_spp <- mobile_grouped %>% select(-any_of(mobile_meta))
+
+# Sanity checks: are these non-negative counts?
+summary(mobile_spp)
+```
+
+### Transformations for multivariate analyses
+
+For community composition, we typically:
+- use **gower** on square-root transformed counts since lots of zeros. Bray-Curtis did not work.
+
+For Gower, multiplying all counts by the same constant (e.g., converting to per m² when all plots have identical area) does **not** change dissimilarities; we still report univariate abundance in **m⁻²** for interpretability.
+
+
+```{r}
+mobile_mat <- mobile_spp %>%
+  mutate(across(everything(), ~replace_na(., 0))) %>% # make the missing values zeros
+  as.matrix()
+
+# gower dissimilarity on sqrt counts because 0s present
+mobile_bc <- vegdist(sqrt(mobile_mat), method = "gower")
+```
+
+### PERMANOVA (adonis2) with permutations constrained by transect
+
+This tests whether multivariate centroids differ by predictors.
+
+```{r}
+set.seed(1)
+
+
+adon_mobile <- adonis2(
+  mobile_bc ~ col_pres * season,
+  data = mobile,
+  permutations = 999,
+  strata = mobile$transect
+)
+
+
+
+adon_mobile
+## Need to add in the pairwise differences-- follow up with this
+```
+
+### Check dispersion (PERMDISP)
+
+PERMANOVA can be sensitive to differences in within-group dispersion.
+
+```{r}
+disp_mobile <- betadisper(mobile_bc, interaction(mobile$col_pres, mobile$season))
+anova(disp_mobile)
+permutest(disp_mobile, permutations = 999)
+TukeyHSD(disp_mobile) # get pairwise differences
+
+# Yes clearly very different dispersion (the size of the circle)--but driven by season based on pairwise
+```
+
+### Ordination: NMDS (visualize patterns)
+
+```{r}
+set.seed(2)
+
+nmds_mobile <- metaMDS(sqrt(mobile_mat), distance = "gower", k = 2, trymax = 100)
+
+nmds_mobile$stress #get the stress
+```
+
+
+```{r}
+# --- NMDS biplot for MOBILE invertebrates ( species vectors) ----
+
+
+set.seed(42)
+
+# Fit species vectors to the NMDS using envfit
+#    - "display = 'species'" returns directions for each taxa
+#    - we fit to sqrt(mobile_mat) if NMDS was based on sqrt counts
+fit_spp <- envfit(nmds_mobile, sqrt(mobile_mat), permutations = 999)
+
+# Extract site scores
+sites_df <- scores(nmds_mobile, display = "sites") %>%
+  as.data.frame() %>%
+  rownames_to_column("site_id") %>%
+  bind_cols(mobile_grouped %>% mutate(site_id = row_number()) %>% select(site_id, season, col_pres, transect))
+
+# Extract species vectors + p-values; keep only significant / strong ones
+vec_df <- scores(fit_spp, display = "vectors") %>%
+  as.data.frame() %>%
+  rownames_to_column("taxon") %>%
+  # p-values are in fit_spp$vectors$pvals; same order as rows in scores()
+  mutate(p = fit_spp$vectors$pvals) %>%
+  # vector strength (longer = stronger relationship with ordination)
+  mutate(r = sqrt(NMDS1^2 + NMDS2^2)) %>%
+  arrange(p) ## all the species have significant vectors
+
+# Choose which taxa to label: either significant + top N by vector length
+alpha <- 0.05
+top_n <- 12
+
+vec_keep <- vec_df %>%
+  filter(p <= alpha) %>%
+  slice_max(order_by = r, n = top_n)
+
+# Scale vectors to match plot extent (so arrows look nice)
+#    This rescales arrows relative to NMDS axes range.
+arrow_mult <- 0.85 * min(
+  diff(range(sites_df$NMDS1)) / diff(range(vec_keep$NMDS1)),
+  diff(range(sites_df$NMDS2)) / diff(range(vec_keep$NMDS2))
+)
+
+vec_keep <- vec_keep %>%
+  mutate(NMDS1 = NMDS1 * arrow_mult,
+         NMDS2 = NMDS2 * arrow_mult)
+
+# Plot: sites + ellipses + species vectors (biplot)
+p_biplot_mobile <- ggplot(sites_df, aes(NMDS1, NMDS2)) +
+  # Sites
+  geom_point(aes(color = season, shape = col_pres), alpha = 0.85, size = 2) +
+  # Group ellipses
+  stat_ellipse(aes(group = interaction(season, col_pres), color = season),
+               level = 0.68, linewidth = 0.7, show.legend = FALSE) +
+  # Species arrows
+  geom_segment(
+    data = vec_keep,
+    aes(x = 0, y = 0, xend = NMDS1, yend = NMDS2),
+    inherit.aes = FALSE,
+    linewidth = 0.7,
+    arrow = arrow(length = unit(0.18, "cm"))
+  ) +
+  # Species labels
+  ggrepel::geom_text_repel(
+    data = vec_keep,
+    aes(x = NMDS1, y = NMDS2, label = taxon),
+    inherit.aes = FALSE,
+    size = 3,
+    max.overlaps = Inf,
+    min.segment.length = 0
+  ) +
+  scale_color_manual(values = season_colors) +
+  labs(
+    #title = "Mobile invertebrates NMDS biplot",
+    subtitle = paste0("Stress = ", round(nmds_mobile$stress, 3)),
+    color = "Season",
+    shape = "Owl limpet present?"
+  ) +
+  theme_classic()+
+  theme(legend.position = "none")
+
+p_biplot_mobile
+```
+
+
+### Univariate summaries (total abundance)
+
+These are interpretable “whole-community” metrics.
+
+```{r}
+mobile_alpha <- mobile_grouped %>%
+  rowwise() %>%
+  mutate(
+    #  mobile plot is 0.25 m² -- I think??? what is it?
+    area_m2 = 0.25,
+    total_abund = sum(c_across(all_of(colnames(mobile_mat))), na.rm = TRUE),
+    total_abund_m2 = total_abund / area_m2,
+  ) %>%
+  ungroup()
+
+mobile_alpha %>% select(season, col_pres, transect, total_abund) %>% glimpse()
+```
+
+#### Mixed models for Individual metrics
+
+- `total_abund`: NB GLMM
+
+```{r}
+m_mobile_total <- glmmTMB(
+  # Model counts with area offset to infer abundance density (per m²)
+  total_abund ~ col_pres * season + offset(log(area_m2)) + (1 | transect),
+  family = nbinom2(),
+  data = mobile_alpha
+)
+
+
+summary(m_mobile_total)
+# Look at the species pairs
+emm_total <- emmeans(m_mobile_total, ~ col_pres|season, type = "response")
+pairs(emm_total, adjust = "tukey")
+
+performance::check_model(m_mobile_total)
+
+# here is your example for limpets.  Do for the rest of the species
+m_mobile_Limpet <- glmmTMB(
+  # Model counts with area offset to infer abundance density (per m²)
+  Limpets ~ col_pres * season + offset(log(area_m2)) + (1 | transect),
+  family = nbinom2(),
+  data = mobile_alpha
+)
+
+
+summary(m_mobile_Limpet)
+emm_limpet <- emmeans(m_mobile_Limpet, ~ col_pres|season, type = "response")
+pairs(emm_limpet, adjust = "tukey")
+
+```
+
+#### Figure: total abundance by COL presence and season
+
+```{r}
+#| fig-width: 14
+#| fig-height: 6 
+
+
+# everything
+p_alpha <- mobile_alpha %>%
+  pivot_longer(cols = c(Limpets:Whelks, total_abund_m2 
+                       
+                        ), names_to = "metric", values_to = "value") %>%
+  mutate(value_log = value+1)%>%
+  ggplot(aes(x = season, y = value_log, shape = col_pres, color = season)) +
+  coord_trans(y = "log")+
+  scale_color_manual(values = season_colors)+
+    scale_fill_manual(values = season_colors)+
+ # ggdist::stat_halfeye(position = position_dodge(width = 0.7), alpha = 0.7) +
+  geom_violin(position = position_dodge(width = 0.7), alpha = 0.25, linewidth = 0.5,
+              aes(fill = season), color = NULL)+ #outlier.shape = NA, alpha = 0.5) +
+  stat_summary(position = position_dodge(width = 0.7))+
+  facet_wrap(~ metric, scales = "free_y")+
+            labs(y = "Density (m⁻²)", x = NULL, fill = "Owl limpet present?",
+      # title = "Mobile invertebrate alpha metrics vs limpet presence and season"
+       ) +
+  theme(legend.position = "none")
+
+## total abundance only
+p_total <- mobile_alpha %>%
+  ggplot(aes(x = season, y = total_abund_m2+1, shape = col_pres, color = season)) +
+  coord_trans(y = "log")+
+  scale_color_manual(values = season_colors)+
+  scale_fill_manual(values = season_colors)+
+ # ggdist::stat_halfeye(position = position_dodge(width = 0.7), alpha = 0.7) +
+  geom_violin(position = position_dodge(width = 0.7), alpha = 0.25, linewidth = 0.5,
+              aes(fill = season), color = NULL, show.legend = FALSE)+ #outlier.shape = NA, alpha = 0.5) +
+  stat_summary(position = position_dodge(width = 0.7), size = 1.5)+
+   labs(y = "Total density (m⁻²)", x = NULL, shape = "Owl limpet present?",
+      # title = "Mobile invertebrate alpha metrics vs limpet presence and season"
+       ) +
+  theme(legend.position = "top")
+
+
+## add in brackets for yes/no pairs for ones that are significant based on emmeans and clean up the title of total_abunc... and double check that the area is correct since I think you did it two different ways
+p_alpha+p_biplot_mobile+plot_annotation(tag_levels = "a")
+ggsave(filename = "figure2.png", width = 14, height = 6)
+```
+
+
+---
+
+## Sessile community (% cover / proportional cover)
+
+### Identify sessile cover columns --- i dont trust this analysis rn
+
+```{r}
+sess_meta <- c("season","date","transect","plot_name","l_r","meter_no","col_pres","t_f","tag_id")
+sess_spp <- sessile %>% select(-any_of(sess_meta))
+
+summary(sess_spp)
+```
+
+### Multivariate test: PERMANOVA on gower
+
+
+```{r}
+sess_mat <- sess_spp %>%
+  mutate(across(everything(), ~replace_na(., 0))) %>%
+  as.matrix()
+
+sess_bc <- vegdist(sqrt(sess_mat), method = "gower")
+
+set.seed(3)
+adon_sess <- adonis2(
+  sess_bc ~ col_pres * season,
+  data = sessile,
+  permutations = 999,
+  strata = sessile$transect
+)
+
+adon_sess
+```
+
+### Dispersion check
+
+```{r}
+disp_sess <- betadisper(sess_bc, interaction(sessile$col_pres, sessile$season))
+anova(disp_sess)
+permutest(disp_sess, permutations = 999)
+```
+
+### Ordination: NMDS
+
+```{r}
+set.seed(4)
+nmds_sess <- metaMDS(sess_mat, distance = "gower", k = 2, trymax = 100)
+nmds_sess$stress
+
+scores_sess <- scores(nmds_sess, display = "sites") %>%
+  as.data.frame() %>%
+  bind_cols(sessile %>% select(season, col_pres, transect))
+
+p_nmds_sess <- ggplot(scores_sess, aes(x = NMDS1, y = NMDS2, shape = col_pres, color = season)) +
+  geom_point(alpha = 0.85, size = 2) +
+  stat_ellipse(aes(group = interaction(season, col_pres)), level = 0.68, linewidth = 0.8) +
+  labs(title = "Sessile community: NMDS (gower on proportional cover)",
+       subtitle = paste0("Stress = ", round(nmds_sess$stress, 3)),
+       shape = "Owl limpet present?", color = "Season") +
+  theme(legend.position = "right")
+
+p_nmds_sess
+```
+
+### Univariate analyses for key functional groups
+
+Depending on your ecological framing,  response variables may include:
+- **Bare rock** (space availability)
+- **Erect fleshy algae** (here likely `ulva_sp`, `endocaldia_sp`, etc.)
+- **Crustose coralline algae** (`coralline_crust`)
+- **Barnacles** (`chtalmus_balanus`)
+- **Tube worms** (`phragmatopoma_californica`) etc.
+
+Where is the microalgae?
+
+Because cover is proportional (0–1), a practical approach is:
+- transform with `logit01()` and use LMM/GLMM with Gaussian errors, OR
+- Beta regression (more complex; `glmmTMB` can do it with `family = beta_family()`).
+
+Here we demonstrate logit-transformed LMMs with transect random intercepts.
+
+```{r}
+# Choose a few focal cover variables to test (edit for your hypotheses)
+focal_cover <- c("bare_rock", "ulva_sp", "coralline_crust", "chtalmus_balanus", "ralfsia_sp")
+
+sess_long <- sessile %>%
+  pivot_longer(cols = all_of(focal_cover), names_to = "taxon", values_to = "cover") %>%
+  mutate(
+    cover = as.numeric(cover),
+    cover_logit = logit01(cover)
+  )
+
+# Fit one model per taxon (pre-specified list!)
+models_cover <- sess_long %>%
+  group_by(taxon) %>%
+  group_map(~{
+    lmer(cover_logit ~ col_pres * season + (1 | transect), data = .x)
+  })
+
+names(models_cover) <- unique(sess_long$taxon)
+
+# Summaries
+lapply(models_cover, summary)
+```
+
+#### Figure: focal cover responses
+
+```{r}
+p_cover <- sess_long %>%
+  ggplot(aes(x = season, y = cover, fill = col_pres)) +
+#  geom_point(position = position_dodge(width = 0.7))+
+ # ggdist::stat_halfeye(position = position_dodge(width = 0.7), alpha = 0.7) +
+  geom_violin(position = position_dodge(width = 0.7), 
+              # outlier.shape = NA, 
+               alpha = 0.5) +
+  facet_wrap(~ taxon, scales = "free_y", ncol = 2) +
+  labs(x = NULL, y = "Proportional cover", fill = "Owl limpet present?",
+       title = "Sessile functional/taxon cover vs limpet presence and season") +
+  theme(legend.position = "top")
+
+p_cover
+```
+
+---
+
+
+## Ecological interpretation (how to read results -- fill in below with your references)
+
+### 1) Seasonal density and size patterns (what’s plausible)
+
+Depending on your results, common mechanisms include:
+
+- **Recruitment pulses** (seasonal larval supply) can increase density of **small** limpets after settlement.
+-- What else do you think?
+
+For owl limpets specifically:
+- *Lottia gigantea* is well known for **territorial grazing** that can maintain “gardens” of microalgae and influence space availability and algal cover (citations).  
+- What else?
+
+### 2) Limpet presence effects on community composition (expected directions)
+
+- fill in
+
+
+**Season interactions** are common because:
+- why?
+
+---
+
+### potenitial storyline
+
+**“Seasonal dynamics modulate the engineering role of a territorial grazer.”**
+
+### Journals to think about
+
+- *Marine Ecology Progress Series* (MEPS)
+- *Journal of Experimental Marine Biology and Ecology*
+- *PeerJ*
+
+---
+
+
