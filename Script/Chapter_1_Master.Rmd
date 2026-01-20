@@ -740,7 +740,9 @@ limpet_lm <- lmer(log(count+1)~COL_pres*Season+(1|Transect),
                 data = grazers_types %>% 
                   filter(grazer_type == "limpet")) #change type
                         
-check_model(limpet_lm) #when I run the check function, I'm having a hard time seeing it
+check_model(limpet_lm)
+ggsave(here("Output", "lmer_type_cm.png"))#when I run the check function, I'm having a hard time seeing it
+#Residuals are not normal, should I get rid of interaction? Or run glmer instead?
 anova(limpet_lm)
 ```
 

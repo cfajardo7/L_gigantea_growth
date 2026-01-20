@@ -53,6 +53,7 @@ This Quarto notebook analyzes three datasets from **Cabrillo National Monument (
 ```{r}
 # Core
 library(tidyverse)
+library(here)
 library(janitor)     # to clean the names for consistency
 
 # Mixed models
@@ -67,13 +68,14 @@ library(broom.mixed) # tidy() for mixed models
 
 # Multivariate community ecology
 library(vegan)       # adonis2, metaMDS, betadisper, envfit
-library(pairwiseAdonis) # optional; pairwise PERMANOVA if needed
+#library(pairwiseAdonis) # optional; pairwise PERMANOVA if needed
 
 # Figures
 library(ggdist)      # raincloud/half-eye
 library(patchwork)   # figure layouts
 library(scales)      # label_percent etc.
 library(ggrepel)
+library(ggpubr)
 
 
 # A consistent plotting theme for a paper
@@ -108,8 +110,10 @@ path_size   <- "limpet_size.csv"
 path_mobile <- "mobile_counts.csv"
 path_sess   <- "sessile_percent_cover.csv"
 
-limpet_size_raw <- read_csv(path_size, show_col_types = FALSE) %>% clean_names() %>%
-  mutate(season = ifelse(season == "Late_Spring", "Spring", season)) # for some reason the season is named Late spring here, but spring everywhere else
+limpet_size_raw <- read_csv(path_size, show_col_types = FALSE) %>% clean_names() %>% 
+  filter(!season %in% "Spring",
+         date != "2023_12_10") %>% 
+  mutate(season = ifelse(season == "Late_Spring", "Spring", season)) # for some reason the season is named Late spring here, but spring everywhere else (This is because when I went out in the winter, I realized that I was loosing tags so we decided to go out and have a re-tagging event in March, or Spring. I re-tagged and measured SL but I didn't do any community surveys, it wasn't part of the plan since I figured it was just about shell length. We then decided to not use the re-tagging event data. I went out again in late May and that is the data that I consider to be the Late_spring data and the only data I use when referring to "Spring". I changed the line of code to reflect that.)
 mobile_raw      <- read_csv(path_mobile, show_col_types = FALSE) %>% clean_names()
 sessile_raw     <- read_csv(path_sess, show_col_types = FALSE) %>% clean_names()
 
@@ -138,7 +142,7 @@ We standardize:
 
 ```{r}
 # Season order 
-season_levels <- c("Winter","Spring","Summer","Fall") # change this order to change order of the plots
+season_levels <- c("Fall", "Winter","Spring","Summer") # change this order to change order of the plots
 
 # Limpet size dataset
 limpet_size <- limpet_size_raw %>%
@@ -164,7 +168,8 @@ mobile <- mobile_raw %>%
       tolower(col_pres) %in% c("n","no","false","f","0") ~ "No",
       TRUE ~ NA_character_
     ) %>% factor(levels = c("No","Yes"))
-  )
+  ) %>%
+  filter(!transect %in% c("CNM_7", "CNM_8"))
 
 # Sessile percent cover (in this file, cover columns appear to be proportions already: 0–1)
 sessile <- sessile_raw %>%
@@ -192,11 +197,11 @@ sessile %>% count(season, col_pres) ## looks like there are missing pairs of col
 
 ### 1A. Density (true density; transect area = 50 m²)
 
-You specified that each limpet-density sampling unit corresponds to a **50 m² transect**.
+You specified that each limpet-density sampling unit corresponds to a **20 m² transect**.
 We therefore compute:
 
 - `n_limpets` = number of limpets observed in a sampling unit
-- `density_m2` = `n_limpets / 50`
+- `density_m2` = `n_limpets / 20`
 
 ```{r}
 limpet_density <- limpet_size %>%
@@ -204,7 +209,7 @@ limpet_density <- limpet_size %>%
   summarise(
     n_limpets = n(),# count all the limpets
     # True density (per m²) using known transect area
-    area_m2 = 50, ## double check this is correct. How long was the transect and how many meters on either size of the transect did you go? 
+    area_m2 = 20, ## double check this is correct. How long was the transect and how many meters on either size of the transect did you go? 
     density_m2 = n_limpets / area_m2,
     mean_sl = mean(sl_mm, na.rm = TRUE), # mean size per transect
     sd_sl = sd(sl_mm, na.rm = TRUE), # standard deviation in size per transect
@@ -231,6 +236,8 @@ p_density <- limpet_density %>%
   theme(legend.position = "none")
 
 p_density
+
+#My interpretation: Density is different seasonally. In the fall, density is high all around. There's more plots with 20 or more individuals per meter squared. There's only one plot that has less than 5 individuals per meter squared. That makes sense to me. There were certain plots that the high density was very visible. Plot CNM_6 had the lowest amount of limpets present every season, this was my observation. In the winter, there's a change. The number of individuals per meter squared drops. Three plots have 15+ per meter squared and 3 plots have less than 10. In the spring you can see the addition of recruits to the plots. Spawning occurs in the winter in January/February. Although I am not sure how long the larvae stage is. I can do some research. The Spring data was collected in late spring (Early June), so it gave time for juveniles to find the population and start growing into adults. Again I don't know much about that stage, I'll scower for papers. In these plots, there's a clear addition of individuals per plot consistent with spawning and the abundance of algae due to seasonal upwelling. 
 ```
 
 #### Model: negative binomial GLMM (random effects for plot)
@@ -240,7 +247,7 @@ Counts are typically overdispersed; negative binomial is usually appropriate.
 ```{r}
 m_density <- glmmTMB(
   # Model counts because negative binomial requires count data with an offset for sampled area to estimate density
-  n_limpets ~ season + offset(log(area_m2)) + (1 | plot_name),
+  n_limpets ~ season + offset(log(area_m2)) + (1 | plot_name), 
   family = nbinom2(),
   data = limpet_density
 )
@@ -248,6 +255,7 @@ m_density <- glmmTMB(
 summary(m_density)
 performance::check_overdispersion(m_density)
 performance::check_zeroinflation(m_density)
+
 ```
 
 ##### Diagnostics (DHARMa)
@@ -257,6 +265,7 @@ sim_density <- DHARMa::simulateResiduals(m_density, n = 1000)
 plot(sim_density)
 DHARMa::testDispersion(sim_density)
 DHARMa::testZeroInflation(sim_density)
+#https://cran.r-project.org/web/packages/DHARMa/vignettes/DHARMa.html
 ```
 
 ##### Effect sizes: estimated marginal means and contrasts
@@ -275,7 +284,7 @@ pairs(emm_density, adjust = "tukey")
 ```{r}
 df_density_emm <- as.data.frame(emm_density) %>%
   mutate(
-    area_m2 = 50,
+    area_m2 = 20,
     density = response / area_m2,
     density_lower = asymp.LCL / area_m2,
     density_upper = asymp.UCL / area_m2
@@ -287,6 +296,8 @@ p_density_emm <- ggplot(df_density_emm, aes(x = season, y = density)) +
               alpha = 0.5, width = 0.1)+
   geom_point(size = 4) +
   geom_errorbar(aes(ymin = density_lower, ymax = density_upper), width = 0.12) +
+ # geom_signif(comparisons = list(c("Fall", "Winter", "Spring")),
+              #map_signif_level = TRUE)+ I added these two lines of code and it gives me a bracket between Fall and winter but it says NS above it. does that mean non significant? Because the emmeans comparisons show that between fall and winter the difference between the means is not zero
   labs(x = NULL, y = "Estimated owl limpet density (individuals m⁻²)",
        title = "Seasonal effect on owl limpet density (model-based NB-GLMM with area offset)") +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))
@@ -304,6 +315,7 @@ Because `sl_mm` is continuous and strictly positive, we typically choose either:
 
 Here, we start with **Gamma GLMM** and fallback if needed.
 The **Gamma** was not a good fit so I went to *Tweedie* which was better but still not great. Keep looking.... the bimodal sizes makes this harder
+What about gaussian with log link or inverse gaussian
 
 ```{r}
 p_size <- limpet_size %>%
@@ -326,20 +338,20 @@ p_size
 #### Gamma  or Tweedie GLMM with random effects for plot
 
 ```{r}
-m_size_gamma <- glmmTMB(
+m_size_tweedie <- glmmTMB(
   sl_mm ~ season + (1 | plot_name),
   dispformula = ~ season,  # Model dispersion as a function of season because unequal variances
   family = tweedie(link = "log"), # better but still not the best, but I trust more this model
   data = limpet_size
 )
 
-summary(m_size_gamma)
+summary(m_size_tweedie)
 ```
 
 ##### Diagnostics
 
 ```{r}
-sim_size <- DHARMa::simulateResiduals(m_size_gamma, n = 1000)
+sim_size <- DHARMa::simulateResiduals(m_size_tweedie, n = 1000)
 plot(sim_size)
 DHARMa::testDispersion(sim_size)
 ```
@@ -347,7 +359,7 @@ DHARMa::testDispersion(sim_size)
 ##### Estimated marginal means (back-transformed to mm)
 
 ```{r}
-emm_size <- emmeans(m_size_gamma, ~ season, type = "response")
+emm_size <- emmeans(m_size_tweedie, ~ season, type = "response")
 emm_size
 pairs(emm_size, adjust = "tukey")
 ```
@@ -372,7 +384,7 @@ p_size_emm
 
 Cumulative distributions are great for communicating shifts in size structure (e.g., truncation).
 
-You would interprethis this plot byt saying: “For each season, what fraction of limpets are smaller than a given shell length?” 
+You would interpret this plot by saying: “For each season, what fraction of limpets are smaller than a given shell length?” 
 
 Example interpretations of the plot
 
@@ -442,11 +454,11 @@ mobile_grouped<-mobile %>%
          Turbans = rowSums(across(c(t_eiseni:t_gallina))),
          Periwinkles = rowSums(across(c(l_plena, l_keenae))),
          Whelks = m_lugubris) %>%
-  select(-c(m_lugubris:l_gigantea))
+  select(-c(m_lugubris:l_gigantea)) # what is -c
 
 # metadata
 mobile_meta <- c("season","date","transect","plot_name","l_r","meter_no","col_pres","t_f","tag_id")
-mobile_spp <- mobile_grouped %>% select(-any_of(mobile_meta))
+mobile_spp <- mobile_grouped %>% select(-any_of(mobile_meta)) #what is -any_of
 
 # Sanity checks: are these non-negative counts?
 summary(mobile_spp)
@@ -458,6 +470,7 @@ For community composition, we typically:
 - use **gower** on square-root transformed counts since lots of zeros. Bray-Curtis did not work.
 
 For Gower, multiplying all counts by the same constant (e.g., converting to per m² when all plots have identical area) does **not** change dissimilarities; we still report univariate abundance in **m⁻²** for interpretability.
+Information on coding dissimilarity indices https://rdrr.io/cran/vegan/man/vegdist.html
 
 
 ```{r}
@@ -488,6 +501,7 @@ adon_mobile <- adonis2(
 
 adon_mobile
 ## Need to add in the pairwise differences-- follow up with this
+#What about pairwise.adonis2()
 ```
 
 ### Check dispersion (PERMDISP)
@@ -504,7 +518,7 @@ TukeyHSD(disp_mobile) # get pairwise differences
 ```
 
 ### Ordination: NMDS (visualize patterns)
-
+Website with info on metaMDS https://vegandevs.github.io/vegan/reference/metaMDS.html
 ```{r}
 set.seed(2)
 
@@ -518,9 +532,9 @@ nmds_mobile$stress #get the stress
 # --- NMDS biplot for MOBILE invertebrates ( species vectors) ----
 
 
-set.seed(42)
+set.seed(42) #did you select 42 for a specific reason?
 
-# Fit species vectors to the NMDS using envfit
+# Fit species vectors to the NMDS using envfit. envfit finds vectors or vector averages
 #    - "display = 'species'" returns directions for each taxa
 #    - we fit to sqrt(mobile_mat) if NMDS was based on sqrt counts
 fit_spp <- envfit(nmds_mobile, sqrt(mobile_mat), permutations = 999)
@@ -595,6 +609,7 @@ p_biplot_mobile <- ggplot(sites_df, aes(NMDS1, NMDS2)) +
   theme(legend.position = "none")
 
 p_biplot_mobile
+
 ```
 
 
@@ -606,7 +621,7 @@ These are interpretable “whole-community” metrics.
 mobile_alpha <- mobile_grouped %>%
   rowwise() %>%
   mutate(
-    #  mobile plot is 0.25 m² -- I think??? what is it?
+    #  mobile plot is 0.25 m² -- This is right
     area_m2 = 0.25,
     total_abund = sum(c_across(all_of(colnames(mobile_mat))), na.rm = TRUE),
     total_abund_m2 = total_abund / area_m2,
@@ -630,7 +645,7 @@ m_mobile_total <- glmmTMB(
 
 
 summary(m_mobile_total)
-# Look at the species pairs
+# Look at the species pairs What do you mean by this?
 emm_total <- emmeans(m_mobile_total, ~ col_pres|season, type = "response")
 pairs(emm_total, adjust = "tukey")
 
