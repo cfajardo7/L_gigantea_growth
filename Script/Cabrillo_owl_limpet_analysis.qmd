@@ -40,7 +40,7 @@ This Quarto notebook analyzes three datasets from **Cabrillo National Monument (
   - and constrain permutations by transect for multivariate tests.
 
 - **Density**:
-  - The transect size was **50 m²** so I divided the counts by this value to get density per transect .
+  - The transect size was **20 m²** so I divided the counts by this value to get density per transect .
 
 - **Community data**:
   - Mobile inverts are **counts** (often overdispersed, zero-inflated).
@@ -68,7 +68,7 @@ library(broom.mixed) # tidy() for mixed models
 
 # Multivariate community ecology
 library(vegan)       # adonis2, metaMDS, betadisper, envfit
-#library(pairwiseAdonis) # optional; pairwise PERMANOVA if needed
+library(pairwiseAdonis) # optional; pairwise PERMANOVA if needed
 
 # Figures
 library(ggdist)      # raincloud/half-eye
@@ -106,11 +106,11 @@ logit01 <- function(p, eps = 1e-4) {
 
 ```{r}
 # File paths (edit if needed)
-path_size   <- "limpet_size.csv"
-path_mobile <- "mobile_counts.csv"
-path_sess   <- "sessile_percent_cover.csv"
+path_size   <- here("Data", "limpet_size.csv")
+path_mobile <- here("Data", "mobile_counts.csv")
+path_sess   <- here("Data", "sessile_percent_cover.csv")
 
-limpet_size_raw <- read_csv(path_size, show_col_types = FALSE) %>% clean_names() %>% 
+limpet_size_raw <-  read_csv(path_size, show_col_types = FALSE) %>% clean_names() %>% 
   filter(!season %in% "Spring",
          date != "2023_12_10") %>% 
   mutate(season = ifelse(season == "Late_Spring", "Spring", season)) # for some reason the season is named Late spring here, but spring everywhere else (This is because when I went out in the winter, I realized that I was loosing tags so we decided to go out and have a re-tagging event in March, or Spring. I re-tagged and measured SL but I didn't do any community surveys, it wasn't part of the plan since I figured it was just about shell length. We then decided to not use the re-tagging event data. I went out again in late May and that is the data that I consider to be the Late_spring data and the only data I use when referring to "Spring". I changed the line of code to reflect that.)
@@ -195,7 +195,7 @@ sessile %>% count(season, col_pres) ## looks like there are missing pairs of col
 
 ## Question 1: Do limpet density and size change by season?
 
-### 1A. Density (true density; transect area = 50 m²)
+### 1A. Density (true density; transect area = 20 m²)
 
 You specified that each limpet-density sampling unit corresponds to a **20 m² transect**.
 We therefore compute:
@@ -291,16 +291,19 @@ df_density_emm <- as.data.frame(emm_density) %>%
   )
 
 # Note add in stars or letters or brackets based on significance testing from the emmeans
-p_density_emm <- ggplot(df_density_emm, aes(x = season, y = density)) +
+p_density_emm <- ggplot(df_density_emm, aes(x = season, y = density)) + 
+  ggdist::stat_slab(data = limpet_density, aes(x = season, y = density_m2, fill = season),adjust = 0.7, width = 0.6, justification = -0.15, show.legend = FALSE)+
   geom_jitter(data = limpet_density, aes(x = season, y = density_m2), 
               alpha = 0.5, width = 0.1)+
   geom_point(size = 4) +
-  geom_errorbar(aes(ymin = density_lower, ymax = density_upper), width = 0.12) +
- # geom_signif(comparisons = list(c("Fall", "Winter", "Spring")),
-              #map_signif_level = TRUE)+ I added these two lines of code and it gives me a bracket between Fall and winter but it says NS above it. does that mean non significant? Because the emmeans comparisons show that between fall and winter the difference between the means is not zero
+  geom_errorbar(data = df_density_emm, aes(ymin = density_lower, ymax = density_upper), width = 0.12) +
+  geom_signif(comparisons = list(c("Fall", "Winter")),
+              map_signif_level = TRUE, # Automatically uses asterisks for p-values
+              annotations = "***")+ # Manually set the annotation. I added these two lines of code and it gives me a bracket between Fall and winter but it says NS above it. does that mean non significant? Because the emmeans comparisons show that between fall and winter the difference between the means is not zero
   labs(x = NULL, y = "Estimated owl limpet density (individuals m⁻²)",
        title = "Seasonal effect on owl limpet density (model-based NB-GLMM with area offset)") +
-  scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))
+  scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
+  scale_fill_manual(values = season_colors)
 
 p_density_emm
 ```
@@ -370,12 +373,21 @@ pairs(emm_size, adjust = "tukey")
 df_size_emm <- as.data.frame(emm_size)
 
 p_size_emm <- ggplot(df_size_emm, aes(x = season, y = response)) +
+  #ggdist::stat_slab(data = limpet_size, aes(x = season, y = sl_mm, fill = season),adjust = 0.7, width = 0.6, justification = -0.15, show.legend = FALSE)+
+  #geom_jitter(data = limpet_size, aes(x = season, y = sl_mm, color = season), width = 0.08, height = 0, alpha = 0.20, size = 0.8)+
   geom_point(size = 2) +
-  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.12) +
+  geom_errorbar(data = df_size_emm, aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.12) +
+  #geom_signif(data = df_size_emm, comparisons = list(c("Fall","Spring"),
+                                                     #c("Winter", "Spring")),
+              #map_signif_level = TRUE, # Automatically uses asterisks for p-values
+              #annotations = "***")+
+  #scale_fill_manual(values = season_colors)+
+  #scale_color_manual(values =season_colors)+
   labs(x = NULL, y = "Estimated mean shell length (mm)",
        #title = "Seasonal effect on owl limpet size (Gamma GLMM)"
        ) +
-  scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))
+  scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
+  theme(legend.position = "none")
 
 p_size_emm
 ```
@@ -420,7 +432,7 @@ You would start with the mean values that you get from the emmeans output of the
 #| fig-height: 6
 ## Bring the figures together for pub quality
 ## Add in stars with brackes to show significance between seasons based on emmeans
-(p_density|p_size|p_cdf)+plot_annotation(tag_levels = "a")
+(p_density_emm|p_size|p_cdf)+plot_annotation(tag_levels = "a")
 ggsave(filename = "figure1.png", width = 14, height = 6)
 
 ```
@@ -500,6 +512,10 @@ adon_mobile <- adonis2(
 
 
 adon_mobile
+pairwise.adonis2(x=mobile_bc ~ col_pres * season,
+                 data = mobile,
+                 method = "gower",
+                 p.adjust.m = "bonferroni")
 ## Need to add in the pairwise differences-- follow up with this
 #What about pairwise.adonis2()
 ```
@@ -622,7 +638,7 @@ mobile_alpha <- mobile_grouped %>%
   rowwise() %>%
   mutate(
     #  mobile plot is 0.25 m² -- This is right
-    area_m2 = 0.25,
+    area_m2 = ifelse(season == "Fall", 0.2, 0.25), #fall plots are circular, this is area of a circle
     total_abund = sum(c_across(all_of(colnames(mobile_mat))), na.rm = TRUE),
     total_abund_m2 = total_abund / area_m2,
   ) %>%
@@ -645,7 +661,7 @@ m_mobile_total <- glmmTMB(
 
 
 summary(m_mobile_total)
-# Look at the species pairs What do you mean by this?
+# Look at the species pairs 
 emm_total <- emmeans(m_mobile_total, ~ col_pres|season, type = "response")
 pairs(emm_total, adjust = "tukey")
 
