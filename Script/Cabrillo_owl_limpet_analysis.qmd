@@ -491,7 +491,7 @@ mobile_mat <- mobile_spp %>%
   as.matrix()
 
 # gower dissimilarity on sqrt counts because 0s present
-mobile_bc <- vegdist(sqrt(mobile_mat), method = "gower")
+mobile_gower <- vegdist(sqrt(mobile_mat), method = "gower")
 ```
 
 ### PERMANOVA (adonis2) with permutations constrained by transect
@@ -503,7 +503,7 @@ set.seed(1)
 
 
 adon_mobile <- adonis2(
-  mobile_bc ~ col_pres * season,
+  mobile_gower ~ col_pres * season,
   data = mobile,
   permutations = 999,
   strata = mobile$transect
@@ -512,7 +512,7 @@ adon_mobile <- adonis2(
 
 
 adon_mobile
-pairwise.adonis2(x=mobile_bc ~ col_pres * season,
+pairwise.adonis2(x=mobile_gower ~ col_pres * season,
                  data = mobile,
                  method = "gower",
                  p.adjust.m = "bonferroni")
@@ -525,12 +525,16 @@ pairwise.adonis2(x=mobile_bc ~ col_pres * season,
 PERMANOVA can be sensitive to differences in within-group dispersion.
 
 ```{r}
-disp_mobile <- betadisper(mobile_bc, interaction(mobile$col_pres, mobile$season))
+disp_mobile <- betadisper(mobile_gower, interaction(mobile$col_pres, mobile$season))
 anova(disp_mobile)
 permutest(disp_mobile, permutations = 999)
 TukeyHSD(disp_mobile) # get pairwise differences
 
 # Yes clearly very different dispersion (the size of the circle)--but driven by season based on pairwise
+# Yes.Fall-No.Fall p=0.5271168
+#Yes.Winter-No.Winter p =0.4522087
+#Yes.Spring-No.Spring p = 0.9995178
+#Becasue the p >0.05, we can reject the null and say that the dispersion are not equal among the groups
 ```
 
 ### Ordination: NMDS (visualize patterns)
@@ -548,7 +552,7 @@ nmds_mobile$stress #get the stress
 # --- NMDS biplot for MOBILE invertebrates ( species vectors) ----
 
 
-set.seed(42) #did you select 42 for a specific reason?
+set.seed(42) 
 
 # Fit species vectors to the NMDS using envfit. envfit finds vectors or vector averages
 #    - "display = 'species'" returns directions for each taxa
@@ -667,7 +671,7 @@ pairs(emm_total, adjust = "tukey")
 
 performance::check_model(m_mobile_total)
 
-# here is your example for limpets.  Do for the rest of the species
+# Limpets
 m_mobile_Limpet <- glmmTMB(
   # Model counts with area offset to infer abundance density (per m²)
   Limpets ~ col_pres * season + offset(log(area_m2)) + (1 | transect),
@@ -680,6 +684,57 @@ summary(m_mobile_Limpet)
 emm_limpet <- emmeans(m_mobile_Limpet, ~ col_pres|season, type = "response")
 pairs(emm_limpet, adjust = "tukey")
 
+# Periwinkles
+m_mobile_Periwinkles <- glmmTMB(
+  # Model counts with area offset to infer abundance density (per m²)
+  Periwinkles ~ col_pres * season + offset(log(area_m2)) + (1 | transect),
+  family = nbinom2(),
+  data = mobile_alpha
+)
+
+
+summary(m_mobile_Periwinkles)
+emm_Periwinkles <- emmeans(m_mobile_Periwinkles, ~ col_pres|season, type = "response")
+pairs(emm_Periwinkles, adjust = "tukey")
+
+# Chitons
+m_mobile_Chitons <- glmmTMB(
+  # Model counts with area offset to infer abundance density (per m²)
+  Chitons ~ col_pres * season + offset(log(area_m2)) + (1 | transect),
+  family = nbinom2(),
+  data = mobile_alpha
+)
+
+
+summary(m_mobile_Chitons)
+emm_Chitons <- emmeans(m_mobile_Chitons, ~ col_pres|season, type = "response")
+pairs(emm_Chitons, adjust = "tukey")
+
+# Turbans
+m_mobile_Turbans <- glmmTMB(
+  # Model counts with area offset to infer abundance density (per m²)
+  Turbans ~ col_pres * season + offset(log(area_m2)) + (1 | transect),
+  family = nbinom2(),
+  data = mobile_alpha
+)
+
+
+summary(m_mobile_Turbans)
+emm_Turbans <- emmeans(m_mobile_Turbans, ~ col_pres|season, type = "response")
+pairs(emm_Turbans, adjust = "tukey")
+
+# Whelks
+m_mobile_Whelks <- glmmTMB(
+  # Model counts with area offset to infer abundance density (per m²)
+  Whelks ~ col_pres * season + offset(log(area_m2)) + (1 | transect),
+  family = nbinom2(),
+  data = mobile_alpha
+)
+
+
+summary(m_mobile_Whelks)
+emm_Whelks <- emmeans(m_mobile_Whelks, ~ col_pres|season, type = "response")
+pairs(emm_Whelks, adjust = "tukey")
 ```
 
 #### Figure: total abundance by COL presence and season
