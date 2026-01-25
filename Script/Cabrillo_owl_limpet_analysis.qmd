@@ -683,6 +683,8 @@ m_mobile_Limpet <- glmmTMB(
 summary(m_mobile_Limpet)
 emm_limpet <- emmeans(m_mobile_Limpet, ~ col_pres|season, type = "response")
 pairs(emm_limpet, adjust = "tukey")
+limpet_pairs <- pairs(emm_limpet, adjust = "tukey")
+limpet_emm_pairs_df <- as.data.frame(limpet_pairs, adjust = "tukey")
 
 # Periwinkles
 m_mobile_Periwinkles <- glmmTMB(
@@ -696,6 +698,8 @@ m_mobile_Periwinkles <- glmmTMB(
 summary(m_mobile_Periwinkles)
 emm_Periwinkles <- emmeans(m_mobile_Periwinkles, ~ col_pres|season, type = "response")
 pairs(emm_Periwinkles, adjust = "tukey")
+periwinkle_pairs <- pairs(emm_Periwinkles, adjust = "tukey")
+periwinkle_emm_pairs_df <- as.data.frame(periwinkle_pairs, adjust = "tukey")
 
 # Chitons
 m_mobile_Chitons <- glmmTMB(
@@ -709,6 +713,8 @@ m_mobile_Chitons <- glmmTMB(
 summary(m_mobile_Chitons)
 emm_Chitons <- emmeans(m_mobile_Chitons, ~ col_pres|season, type = "response")
 pairs(emm_Chitons, adjust = "tukey")
+chiton_pairs<- pairs(emm_Chitons, adjust = "tukey")
+chiton_emm_pairs_df <- as.data.frame(chiton_pairs, adjust = "tukey")
 
 # Turbans
 m_mobile_Turbans <- glmmTMB(
@@ -722,6 +728,8 @@ m_mobile_Turbans <- glmmTMB(
 summary(m_mobile_Turbans)
 emm_Turbans <- emmeans(m_mobile_Turbans, ~ col_pres|season, type = "response")
 pairs(emm_Turbans, adjust = "tukey")
+turban_pairs <- pairs(emm_Turbans, adjust = "tukey")
+turban_emm_pairs_df <- as.data.frame(turban_pairs, adjust = "tukey")
 
 # Whelks
 m_mobile_Whelks <- glmmTMB(
@@ -735,6 +743,10 @@ m_mobile_Whelks <- glmmTMB(
 summary(m_mobile_Whelks)
 emm_Whelks <- emmeans(m_mobile_Whelks, ~ col_pres|season, type = "response")
 pairs(emm_Whelks, adjust = "tukey")
+whelk_pairs <- pairs(emm_Whelks, adjust = "tukey")
+whelk_emm_pairs_df <- as.data.frame(whelk_pairs, adjust = "tukey")
+
+combined_contrast <- rbind((limpet_emm_pairs_df),(periwinkle_emm_pairs_df), (chiton_emm_pairs_df), (turban_emm_pairs_df), (turban_emm_pairs_df))
 ```
 
 #### Figure: total abundance by COL presence and season
@@ -743,26 +755,27 @@ pairs(emm_Whelks, adjust = "tukey")
 #| fig-width: 14
 #| fig-height: 6 
 
-
 # everything
 p_alpha <- mobile_alpha %>%
-  pivot_longer(cols = c(Limpets:Whelks, total_abund_m2 
-                       
-                        ), names_to = "metric", values_to = "value") %>%
+  pivot_longer(cols = c(Limpets:Whelks, total_abund_m2), 
+               names_to = "metric", 
+               values_to = "value") %>%
   mutate(value_log = value+1)%>%
-  ggplot(aes(x = season, y = value_log, shape = col_pres, color = season)) +
+  ggplot(aes(x = season, 
+             y = value_log, 
+             shape = col_pres, 
+             color = season)) +
   coord_trans(y = "log")+
   scale_color_manual(values = season_colors)+
-    scale_fill_manual(values = season_colors)+
+  scale_fill_manual(values = season_colors)+
  # ggdist::stat_halfeye(position = position_dodge(width = 0.7), alpha = 0.7) +
   geom_violin(position = position_dodge(width = 0.7), alpha = 0.25, linewidth = 0.5,
-              aes(fill = season), color = NULL)+ #outlier.shape = NA, alpha = 0.5) +
+              aes(fill = season), color = NULL, show.legend = FALSE)+ #outlier.shape = NA, alpha = 0.5) +
   stat_summary(position = position_dodge(width = 0.7))+
-  facet_wrap(~ metric, scales = "free_y")+
-            labs(y = "Density (m⁻²)", x = NULL, fill = "Owl limpet present?",
-      # title = "Mobile invertebrate alpha metrics vs limpet presence and season"
-       ) +
-  theme(legend.position = "none")
+  facet_wrap(~ metric, scales = "free_x")+
+            labs(y = "Density (m⁻²)", x = NULL, fill = "Owl limpet present?", color = "Season", shape = "Present")+
+      # title = "Mobile invertebrate alpha metrics vs limpet presence and season" 
+  theme(legend.position = "top")
 
 ## total abundance only
 p_total <- mobile_alpha %>%
@@ -783,6 +796,8 @@ p_total <- mobile_alpha %>%
 ## add in brackets for yes/no pairs for ones that are significant based on emmeans and clean up the title of total_abunc... and double check that the area is correct since I think you did it two different ways
 p_alpha+p_biplot_mobile+plot_annotation(tag_levels = "a")
 ggsave(filename = "figure2.png", width = 14, height = 6)
+
+#graph with brackets was saved to E:\Thesis Data\R Figures
 ```
 
 
