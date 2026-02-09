@@ -76,6 +76,10 @@ library(patchwork)   # figure layouts
 library(scales)      # label_percent etc.
 library(ggrepel)
 library(ggpubr)
+library(knitr)
+library(kableExtra)
+library(webshot2)
+library(rerddap)
 
 
 # A consistent plotting theme for a paper
@@ -125,8 +129,8 @@ glimpse(sessile_raw)
 season_colors <- c( 
   Winter = "#1F4E79",
   Spring = "#2E8B57",
-  Fall   = "#C65D2E"
-)
+  Fall   = "#C65D2E",
+  Summer = "#b30b27")
 
 ```
 
@@ -300,12 +304,14 @@ p_density_emm <- ggplot(df_density_emm, aes(x = season, y = density)) +
   geom_signif(comparisons = list(c("Fall", "Winter")),
               map_signif_level = TRUE, # Automatically uses asterisks for p-values
               annotations = "***")+ # Manually set the annotation. I added these two lines of code and it gives me a bracket between Fall and winter but it says NS above it. does that mean non significant? Because the emmeans comparisons show that between fall and winter the difference between the means is not zero
-  labs(x = NULL, y = "Estimated owl limpet density (individuals m⁻²)",
+  labs(x = NULL, y = "Estimated owl limpet density (individuals/m⁻²)",
        title = "Seasonal effect on owl limpet density (model-based NB-GLMM with area offset)") +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
   scale_fill_manual(values = season_colors)
+ggsave(filename = "figure3.png", width = 9, height = 6)
 
 p_density_emm
+
 ```
 
 ---
@@ -326,8 +332,8 @@ p_size <- limpet_size %>%
   ggdist::stat_halfeye(adjust = 0.7, width = 0.6, justification = -0.15, aes(fill = season)) +
   geom_boxplot(width = 0.18, outlier.shape = NA) +
   geom_jitter(width = 0.08, height = 0, alpha = 0.20, size = 0.8) +
-  labs(x = NULL, y = "Shell length (mm)"
-       #title = "Owl limpet size distribution by season"
+  labs(x = NULL, y = "Shell length (mm)",
+       title = "Owl limpet size distribution by season"
        ) +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
    scale_color_manual(values = season_colors)+
@@ -373,21 +379,18 @@ pairs(emm_size, adjust = "tukey")
 df_size_emm <- as.data.frame(emm_size)
 
 p_size_emm <- ggplot(df_size_emm, aes(x = season, y = response)) +
-  #ggdist::stat_slab(data = limpet_size, aes(x = season, y = sl_mm, fill = season),adjust = 0.7, width = 0.6, justification = -0.15, show.legend = FALSE)+
-  #geom_jitter(data = limpet_size, aes(x = season, y = sl_mm, color = season), width = 0.08, height = 0, alpha = 0.20, size = 0.8)+
+  ggdist::stat_slab(data = limpet_size, aes(x = season, y = sl_mm, fill = season),adjust = 0.7, width = 0.6, justification = -0.15, show.legend = FALSE)+
+  geom_jitter(data = limpet_size, aes(x = season, y = sl_mm, color = season), width = 0.08, height = 0, alpha = 0.12, size = 0.8)+
   geom_point(size = 2) +
   geom_errorbar(data = df_size_emm, aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.12) +
-  #geom_signif(data = df_size_emm, comparisons = list(c("Fall","Spring"),
-                                                     #c("Winter", "Spring")),
-              #map_signif_level = TRUE, # Automatically uses asterisks for p-values
-              #annotations = "***")+
-  #scale_fill_manual(values = season_colors)+
-  #scale_color_manual(values =season_colors)+
+  scale_fill_manual(values = season_colors)+
+  scale_color_manual(values =season_colors)+
   labs(x = NULL, y = "Estimated mean shell length (mm)",
-       #title = "Seasonal effect on owl limpet size (Gamma GLMM)"
+       title = "Seasonal effect on owl limpet size (Gamma GLMM)"
        ) +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
   theme(legend.position = "none")
+ggsave(filename = "figure4.png", width = 14, height = 6)
 
 p_size_emm
 ```
@@ -415,9 +418,8 @@ p_cdf <- limpet_size %>%
   stat_ecdf(linewidth = 1) +
   scale_color_manual(values = season_colors)+
   labs(x = "Shell length (mm)", y = "Empirical CDF",
-       #title = "Seasonal shifts in size structure (ECDF)"
-       ) +
-  theme(legend.position = "none")
+       title = "Seasonal shifts in size structure (ECDF)", color = "Season")
+ggsave(filename="cdf.png", width = 10, height = 6)
 
 p_cdf
 ```
@@ -432,10 +434,113 @@ You would start with the mean values that you get from the emmeans output of the
 #| fig-height: 6
 ## Bring the figures together for pub quality
 ## Add in stars with brackes to show significance between seasons based on emmeans
-(p_density_emm|p_size|p_cdf)+plot_annotation(tag_levels = "a")
+OL_den_sl <- (p_density_emm+labs(title = NULL)|p_size+labs(title = NULL)|p_cdf+labs(title = NULL))+plot_annotation(tag_levels = "a")
+OL_den_sl
 ggsave(filename = "figure1.png", width = 14, height = 6)
+#title = "Seasonal effects on Owl Limpet Density and Shell Length"
+```
+##### Physical Metrics
+Because my work is heavily tied to physical changes that is correlated to seasonal change, I have pulled temperature and upwelling data from NOAA's ERDAP data. The upwelling data that I used is the CUTI(Coastal Upwelling Transport Index). Temperature data is sea surface temperature that is collected from buoys.
+```{r}
+# CUTI Data
+# This pulls data
+  cnm_upwelling_data<-griddap(datasetx = "erdCUTIdaily", 
+                         url = "https://oceanview.pfeg.noaa.gov/erddap/", 
+                         time = c("2023-06-15", "2024-06-15"),
+                         latitude =  c(32.0, 33.0),
+                         fields = "CUTI")$data %>% 
+    mutate(date = as.Date(stringr::str_remove(time, "T00:00:00Z"))) %>% 
+    select(latitude, date, CUTI) %>% 
+    na.omit()%>%
+    mutate(month = month(date), # extract the month
+           year = year(date),
+           site = "CNM Zone III",
+           season  = case_when( # make a season
+             month %in% c(12,1,2) ~ "Winter",
+             month %in% c(3,4,5) ~ "Spring",
+             month %in% c(6,7,8) ~ "Summer",
+             month %in% c(9,10,11) ~ "Fall"
+           ),
+           season = factor(season),
+           season = fct_relevel(season, c("Fall","Winter","Spring","Summer")))
+  
+upw_line <- ggplot(cnm_upwelling_data, aes(x = date, y = CUTI))+
+    geom_point(aes(color = season, alpha = 2))+
+    guides(alpha = "none")+
+    geom_smooth(method = "loess", se = TRUE, color = "black")+
+  scale_color_manual(values = season_colors)+
+    labs(x=NULL, y= "Coastal Upwelling Transport Index", color = "Season")+
+    theme_bw()
+
+upw_line    
+  
+upw_box <- cnm_upwelling_data %>%
+    filter(latitude== "32") %>% 
+    ggplot(aes(x = as.factor(year), y = CUTI, fill = season))+
+    geom_boxplot()+
+  scale_fill_manual(values = season_colors)+
+    labs(fill = "Season",
+         x = "Year",
+         y = "Upwelling")
+upw_box
+
+##### Temperature Data
+# This Pulls Data
+cnm_bouy_temp_data<-griddap(datasetx = "ncdcOisst21Agg_LonPM180", 
+                   url = "https://coastwatch.pfeg.noaa.gov/erddap/", 
+                   time = c("2023-06-15", "2024-06-15"), 
+                   zlev = c(0,0), # this is the depth, it wants a range
+                   latitude =  c(32.375,32.875),
+                   longitude = c(-117.625,-117.625),
+                   fields = "sst")$data %>% 
+  mutate(time = as.Date(stringr::str_remove(time, "T00:00:00Z"))) %>% 
+  select(longitude, latitude, time, sst) %>% 
+  na.omit()%>%
+  mutate(month = month(time), # extract the month
+         year = year(time),
+         site = "Cabrillo National Monument",
+         season  = case_when( # make a season
+           month %in% c(12,1,2) ~ "Winter",
+             month %in% c(3,4,5) ~ "Spring",
+             month %in% c(6,7,8) ~ "Summer",
+             month %in% c(9,10,11) ~ "Fall"
+         ),
+         season = factor(season),
+         season = fct_relevel(season, c("Fall","Winter","Spring","Summer")))
+
+temp_line <- ggplot(cnm_bouy_temp_data, aes(x = time, y = sst))+
+  geom_point(aes(color = season, alpha = 2))+
+    guides(alpha = "none")+
+    guides(color = "none")+
+    geom_smooth(method = "loess", se = TRUE, color = "black")+
+  scale_color_manual(values = season_colors)+
+    labs(x=NULL, y= "Sea Surface Temperature (C°)", color = "Season")+
+    theme_bw()
+temp_line
+
+temp_box <- cnm_bouy_temp_data %>%
+    ggplot(aes(x = as.factor(year), y = sst, fill = season))+
+    geom_boxplot()+
+  scale_fill_manual(values = season_colors)+
+    labs(fill = "Season",
+         x = "Year",
+         y = "Sea Surface Temperature (C°)")
+temp_box
 
 ```
+```{r}
+#| fig-width: 14
+#| fig-height: 6
+## Bring the figures together for pub quality
+upline_templine_cnm <- (temp_line+labs(title = NULL) | upw_line+labs(title = NULL)+plot_annotation(tag_levels = "a"))
+upline_templine_cnm
+ggsave(filename = "upline_templine_cnm.png", width = 14, height = 6)
+#title = "Seasonal effects on Owl Limpet Density and Shell Length"
+```
+
+
+
+
 ## Question 2: Does limpet presence affect community composition, and does it interact with season?
 
 We analyze both:
@@ -511,7 +616,7 @@ adon_mobile <- adonis2(
 
 
 
-adon_mobile
+print(adon_mobile)
 pairwise.adonis2(x=mobile_gower ~ col_pres * season,
                  data = mobile,
                  method = "gower",
@@ -528,13 +633,14 @@ PERMANOVA can be sensitive to differences in within-group dispersion.
 disp_mobile <- betadisper(mobile_gower, interaction(mobile$col_pres, mobile$season))
 anova(disp_mobile)
 permutest(disp_mobile, permutations = 999)
-TukeyHSD(disp_mobile) # get pairwise differences
-
+tukey_disp <- TukeyHSD(disp_mobile) # get pairwise differences
+tukey_disp
 # Yes clearly very different dispersion (the size of the circle)--but driven by season based on pairwise
 # Yes.Fall-No.Fall p=0.5271168
 #Yes.Winter-No.Winter p =0.4522087
 #Yes.Spring-No.Spring p = 0.9995178
-#Becasue the p >0.05, we can reject the null and say that the dispersion are not equal among the groups
+
+
 ```
 
 ### Ordination: NMDS (visualize patterns)
@@ -620,7 +726,7 @@ p_biplot_mobile <- ggplot(sites_df, aes(NMDS1, NMDS2)) +
   ) +
   scale_color_manual(values = season_colors) +
   labs(
-    #title = "Mobile invertebrates NMDS biplot",
+    title = "Mobile invertebrates NMDS biplot",
     subtitle = paste0("Stress = ", round(nmds_mobile$stress, 3)),
     color = "Season",
     shape = "Owl limpet present?"
@@ -660,24 +766,22 @@ m_mobile_total <- glmmTMB(
   # Model counts with area offset to infer abundance density (per m²)
   total_abund ~ col_pres * season + offset(log(area_m2)) + (1 | transect),
   family = nbinom2(),
-  data = mobile_alpha
-)
+  data = mobile_alpha)
 
 
 summary(m_mobile_total)
-# Look at the species pairs 
 emm_total <- emmeans(m_mobile_total, ~ col_pres|season, type = "response")
 pairs(emm_total, adjust = "tukey")
 
 performance::check_model(m_mobile_total)
 
+# Species pairs
 # Limpets
 m_mobile_Limpet <- glmmTMB(
   # Model counts with area offset to infer abundance density (per m²)
   Limpets ~ col_pres * season + offset(log(area_m2)) + (1 | transect),
   family = nbinom2(),
-  data = mobile_alpha
-)
+  data = mobile_alpha)
 
 
 summary(m_mobile_Limpet)
@@ -685,14 +789,14 @@ emm_limpet <- emmeans(m_mobile_Limpet, ~ col_pres|season, type = "response")
 pairs(emm_limpet, adjust = "tukey")
 limpet_pairs <- pairs(emm_limpet, adjust = "tukey")
 limpet_emm_pairs_df <- as.data.frame(limpet_pairs, adjust = "tukey")
+performance::check_model(m_mobile_Limpet)
 
 # Periwinkles
 m_mobile_Periwinkles <- glmmTMB(
   # Model counts with area offset to infer abundance density (per m²)
   Periwinkles ~ col_pres * season + offset(log(area_m2)) + (1 | transect),
   family = nbinom2(),
-  data = mobile_alpha
-)
+  data = mobile_alpha)
 
 
 summary(m_mobile_Periwinkles)
@@ -700,14 +804,14 @@ emm_Periwinkles <- emmeans(m_mobile_Periwinkles, ~ col_pres|season, type = "resp
 pairs(emm_Periwinkles, adjust = "tukey")
 periwinkle_pairs <- pairs(emm_Periwinkles, adjust = "tukey")
 periwinkle_emm_pairs_df <- as.data.frame(periwinkle_pairs, adjust = "tukey")
+performance::check_model(m_mobile_Periwinkles)
 
 # Chitons
 m_mobile_Chitons <- glmmTMB(
   # Model counts with area offset to infer abundance density (per m²)
   Chitons ~ col_pres * season + offset(log(area_m2)) + (1 | transect),
   family = nbinom2(),
-  data = mobile_alpha
-)
+  data = mobile_alpha)
 
 
 summary(m_mobile_Chitons)
@@ -715,14 +819,14 @@ emm_Chitons <- emmeans(m_mobile_Chitons, ~ col_pres|season, type = "response")
 pairs(emm_Chitons, adjust = "tukey")
 chiton_pairs<- pairs(emm_Chitons, adjust = "tukey")
 chiton_emm_pairs_df <- as.data.frame(chiton_pairs, adjust = "tukey")
+performance::check_model(m_mobile_Chitons) #have high collineararity coefficient
 
 # Turbans
 m_mobile_Turbans <- glmmTMB(
   # Model counts with area offset to infer abundance density (per m²)
   Turbans ~ col_pres * season + offset(log(area_m2)) + (1 | transect),
   family = nbinom2(),
-  data = mobile_alpha
-)
+  data = mobile_alpha)
 
 
 summary(m_mobile_Turbans)
@@ -730,14 +834,14 @@ emm_Turbans <- emmeans(m_mobile_Turbans, ~ col_pres|season, type = "response")
 pairs(emm_Turbans, adjust = "tukey")
 turban_pairs <- pairs(emm_Turbans, adjust = "tukey")
 turban_emm_pairs_df <- as.data.frame(turban_pairs, adjust = "tukey")
+performance::check_model(m_mobile_Turbans) #have high collineararity coefficient
 
 # Whelks
 m_mobile_Whelks <- glmmTMB(
   # Model counts with area offset to infer abundance density (per m²)
   Whelks ~ col_pres * season + offset(log(area_m2)) + (1 | transect),
   family = nbinom2(),
-  data = mobile_alpha
-)
+  data = mobile_alpha)
 
 
 summary(m_mobile_Whelks)
@@ -745,6 +849,7 @@ emm_Whelks <- emmeans(m_mobile_Whelks, ~ col_pres|season, type = "response")
 pairs(emm_Whelks, adjust = "tukey")
 whelk_pairs <- pairs(emm_Whelks, adjust = "tukey")
 whelk_emm_pairs_df <- as.data.frame(whelk_pairs, adjust = "tukey")
+performance::check_model(m_mobile_Whelks) #have high collineararity coefficient
 
 combined_contrast <- rbind((limpet_emm_pairs_df),(periwinkle_emm_pairs_df), (chiton_emm_pairs_df), (turban_emm_pairs_df), (turban_emm_pairs_df))
 ```
@@ -773,6 +878,7 @@ p_alpha <- mobile_alpha %>%
               aes(fill = season), color = NULL, show.legend = FALSE)+ #outlier.shape = NA, alpha = 0.5) +
   stat_summary(position = position_dodge(width = 0.7))+
   facet_wrap(~ metric, scales = "free_x")+
+          scale_y_continuous(breaks = c(1,10,100,200))+
             labs(y = "Density (m⁻²)", x = NULL, fill = "Owl limpet present?", color = "Season", shape = "Present")+
       # title = "Mobile invertebrate alpha metrics vs limpet presence and season" 
   theme(legend.position = "top")
