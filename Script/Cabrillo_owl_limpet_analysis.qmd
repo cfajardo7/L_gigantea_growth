@@ -417,7 +417,7 @@ p_small_density_emm <- ggplot(df_small_density_emm, aes(x = season, y = density)
   geom_signif(comparisons = list(c("Fall", "Winter")),
               map_signif_level = TRUE, # Automatically uses asterisks for p-values
               annotations = "***")+ # Manually set the annotation. I added these two lines of code and it gives me a bracket between Fall and winter but it says NS above it. does that mean non significant? Because the emmeans comparisons show that between fall and winter the difference between the means is not zero
-  labs(x = NULL, y = "Estimated owl limpet density (individuals/m⁻²)",
+  labs(x = NULL, y = "Estimated owl limpet density (small individuals/m⁻²)",
        title = "Seasonal effect on small owl limpet density (model-based NB-GLMM with area offset)") +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
   scale_fill_manual(values = season_colors)
@@ -484,7 +484,7 @@ p_large_density_emm <- ggplot(df_large_density_emm, aes(x = season, y = density)
    geom_signif(comparisons = list(c("Fall", "Spring")),
               map_signif_level = TRUE, # Automatically uses asterisks for p-values
               annotations = "***")+
-  labs(x = NULL, y = "Estimated owl limpet density (individuals/m⁻²)",
+  labs(x = NULL, y = "Estimated owl limpet density (large individuals/m⁻²)",
        title = "Seasonal effect on large owl limpet density (model-based NB-GLMM with area offset)") +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
   scale_fill_manual(values = season_colors)
@@ -754,7 +754,7 @@ p_large_size_emm
 ## Add in stars with brackes to show significance between seasons based on emmeans
 small_large_SL <- (p_small_size_emm+labs(title = NULL)|p_large_size_emm+labs(title = NULL))+plot_annotation(tag_levels = "a")
 small_large_SL
-ggsave(filename = "small_large.png", width = 14, height = 6)
+ggsave(filename = "small_large_sl.png", width = 14, height = 6)
 #title = "Seasonal effects on Owl Limpet Density and Shell Length"
 ```
 
