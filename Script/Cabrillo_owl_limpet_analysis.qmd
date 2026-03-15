@@ -81,7 +81,7 @@ library(knitr)
 library(kableExtra)
 library(webshot2)
 library(rerddap)
-#library(ggmap)
+library(ggmap)
 
 
 # A consistent plotting theme for a paper
@@ -115,6 +115,7 @@ logit01 <- function(p, eps = 1e-4) {
 path_size   <- here("Data", "limpet_size.csv")
 path_mobile <- here("Data", "mobile_counts.csv")
 path_sess   <- here("Data", "sessile_percent_cover.csv")
+path_coordinates <- here("Data", "transect_coordinates.csv")
 
 limpet_size_raw <-  read_csv(path_size, show_col_types = FALSE) %>% clean_names() %>% 
   filter(!season %in% "Spring",
@@ -123,6 +124,8 @@ limpet_size_raw <-  read_csv(path_size, show_col_types = FALSE) %>% clean_names(
          size = ifelse(sl_mm >= 30,"large", "small")) # for some reason the season is named Late spring here, but spring everywhere else (This is because when I went out in the winter, I realized that I was loosing tags so we decided to go out and have a re-tagging event in March, or Spring. I re-tagged and measured SL but I didn't do any community surveys, it wasn't part of the plan since I figured it was just about shell length. We then decided to not use the re-tagging event data. I went out again in late May and that is the data that I consider to be the Late_spring data and the only data I use when referring to "Spring". I changed the line of code to reflect that.)
 mobile_raw      <- read_csv(path_mobile, show_col_types = FALSE) %>% clean_names()
 sessile_raw     <- read_csv(path_sess, show_col_types = FALSE) %>% clean_names()
+
+transect_coordinates <- read_csv(path_coordinates, show_col_types = FALSE) %>% clean_names()
 
 glimpse(limpet_size_raw)
 glimpse(mobile_raw)
@@ -585,7 +588,9 @@ small_large_size <- limpet_size %>%
   ggplot(aes(x = size, y = sl_mm, color = size)) +
   ggdist::stat_halfeye(adjust = 0.7, width = 0.6, justification = -0.15, aes(fill = size)) +
   geom_boxplot(width = 0.18, outlier.shape = NA) +
-  geom_jitter(width = 0.08, height = 0, alpha = 0.20, size = 0.8) +
+  geom_jitter(width = 0.08, height = 0, alpha = 0.10, size = 0.8) +
+  scale_fill_manual(values = size_colors)+
+  scale_color_manual(values =size_colors)+
   labs(x = NULL, y = "Shell length (mm)",
        title = "Owl limpet size distribution by size"
        ) +
@@ -810,7 +815,7 @@ ggsave(filename = "p_small_size_emm.png", width = 14, height = 6)
 p_small_size_emm
 
 ```
-### Size (`sl_mm`) by transect for large limpets for entire popultion
+### Size (`sl_mm`) by transect for large limpets
 
 Here I will analyze large individuals (>30 mm)
 
@@ -934,6 +939,17 @@ p_size_season
 ```
 
 ```{r}
+#| fig-width: 14
+#| fig-height: 6
+## Bring the figures together for pub quality
+## Add in stars with brackes to show significance between seasons based on emmeans
+small_large_SL <- (p_small_size_emm+labs(title = NULL)|p_large_size_emm+labs(title = NULL))+plot_annotation(tag_levels = "a")
+small_large_SL
+ggsave(filename = "small_large_sl.png", width = 14, height = 6)
+#title = "Seasonal effects on Owl Limpet Density and Shell Length"
+```
+
+```{r}
 size_season_gamma <- glmmTMB(
   sl_mm ~ size*season + (1 | plot_name),
   family = Gamma(link = "log"),
@@ -990,16 +1006,6 @@ p_size_season_emm
 
 ```
 
-```{r}
-#| fig-width: 14
-#| fig-height: 6
-## Bring the figures together for pub quality
-## Add in stars with brackes to show significance between seasons based on emmeans
-small_large_SL <- (p_small_size_emm+labs(title = NULL)|p_large_size_emm+labs(title = NULL))+plot_annotation(tag_levels = "a")
-small_large_SL
-ggsave(filename = "small_large_sl.png", width = 14, height = 6)
-#title = "Seasonal effects on Owl Limpet Density and Shell Length"
-```
 
 #### Different kind of visual to look at size structure shifts (CDFs)
 
@@ -1150,11 +1156,16 @@ ggsave(filename = "upline_templine_cnm.png", width = 14, height = 6)
 
 #### Site Map
 ```{r}
-zone3 <- data.frame(lon = 117.246428, lat = 32.671586)
+zone3 <- data.frame(lon = -117.2444128, lat = 32.666561)
 
-map1 <- get_map(zone3)
+map1 <- get_map(zone3, zoom = 19, , maptype = "satellite")
 
-ggmap(map1)
+site_map <- ggmap(map1)+
+  geom_point(data = transect_coordinates, 
+             aes(x = long, y = lat, color = transect))
+site_map
+ggsave(filename = "site_map.png", width = 14, height = 6)
+
 ```
 
 
