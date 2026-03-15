@@ -55,6 +55,7 @@ This Quarto notebook analyzes three datasets from **Cabrillo National Monument (
 library(tidyverse)
 library(here)
 library(janitor)     # to clean the names for consistency
+library(car)
 
 # Mixed models
 library(glmmTMB)     # flexible GLMMs (NB, Gamma, etc.)
@@ -80,6 +81,7 @@ library(knitr)
 library(kableExtra)
 library(webshot2)
 library(rerddap)
+#library(ggmap)
 
 
 # A consistent plotting theme for a paper
@@ -132,6 +134,10 @@ season_colors <- c(
   Spring = "#2E8B57",
   Fall   = "#C65D2E",
   Summer = "#b30b27")
+
+size_colors <- c(
+  large = "#de1899",
+  small = "#2a8eeb")
 
 ```
 
@@ -348,9 +354,6 @@ p_density_emm <- ggplot(df_density_emm, aes(x = season, y = density)) +
               alpha = 0.5, width = 0.1)+
   geom_point(size = 4) +
   geom_errorbar(data = df_density_emm, aes(ymin = density_lower, ymax = density_upper), width = 0.12) +
-  geom_signif(comparisons = list(c("Fall", "Winter")),
-              map_signif_level = TRUE, # Automatically uses asterisks for p-values
-              annotations = "***")+ # Manually set the annotation. I added these two lines of code and it gives me a bracket between Fall and winter but it says NS above it. does that mean non significant? Because the emmeans comparisons show that between fall and winter the difference between the means is not zero
   labs(x = NULL, y = "Estimated owl limpet density (individuals/m⁻²)",
        title = "Seasonal effect on owl limpet density (model-based NB-GLMM with area offset)") +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
@@ -416,7 +419,10 @@ p_small_density_emm <- ggplot(df_small_density_emm, aes(x = season, y = density)
   geom_errorbar(data = df_small_density_emm, aes(ymin = density_lower, ymax = density_upper), width = 0.12) +
   geom_signif(comparisons = list(c("Fall", "Winter")),
               map_signif_level = TRUE, # Automatically uses asterisks for p-values
-              annotations = "***")+ # Manually set the annotation. I added these two lines of code and it gives me a bracket between Fall and winter but it says NS above it. does that mean non significant? Because the emmeans comparisons show that between fall and winter the difference between the means is not zero
+              annotations = "*")+ 
+  geom_signif(comparisons = list(c("Winter", "Spring")),
+              map_signif_level = TRUE, # Automatically uses asterisks for p-values
+              annotations = "*")+
   labs(x = NULL, y = "Estimated owl limpet density (small individuals/m⁻²)",
        title = "Seasonal effect on small owl limpet density (model-based NB-GLMM with area offset)") +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
@@ -517,6 +523,133 @@ The **Gamma** was not a good fit so I went to *Tweedie* which was better but sti
 What about gaussian with log link or inverse gaussian
 
 ```{r}
+whole_pop_sl_dist <- limpet_size %>% 
+  ggplot(aes(x= sl_mm))+
+  geom_histogram(fill= "gray",
+                 colour= "black",
+                 alpha=1)+
+  labs(title = "Shell Length Distribution Sep 2023-June 2024",
+         x = "Shell Length (mm)",
+       y = "Owl Limpet Count")+
+  theme(axis.title.x = element_text(size = 10),
+        axis.text.x = element_text(size = 9),
+        axis.title.y = element_text(size= 10),
+        axis.text.y = element_text(size= 9))+
+  geom_vline(xintercept = 34,
+             linetype="dashed")
+whole_pop_sl_dist
+```
+
+```{r}
+small_size <- limpet_size %>% 
+  filter(size == "small")
+
+small_pop_sl_dist <- small_size %>% 
+  ggplot(aes(x= sl_mm))+
+  geom_histogram(fill= "gray",
+                 colour= "black",
+                 alpha=1,
+                 binwidth = 2)+
+  labs(title = "Shell Length Distribution of Small Individuals Sep 2023-June 2024",
+         x = "Shell Length (mm)",
+       y = "Owl Limpet Count")+
+  theme(axis.title.x = element_text(size = 10),
+        axis.text.x = element_text(size = 9),
+        axis.title.y = element_text(size= 10),
+        axis.text.y = element_text(size= 9))
+small_pop_sl_dist
+```
+
+```{r}
+large_size <- limpet_size %>% 
+  filter(size == "large")
+
+large_pop_sl_dist <- large_size %>% 
+  ggplot(aes(x= sl_mm))+
+  geom_histogram(fill= "gray",
+                 colour= "black",
+                 alpha=1,
+                 binwidth = 2)+
+  labs(title = "Shell Length Distribution of Large Individuals Sep 2023-June 2024",
+         x = "Shell Length (mm)",
+       y = "Owl Limpet Count")+
+  theme(axis.title.x = element_text(size = 10),
+        axis.text.x = element_text(size = 9),
+        axis.title.y = element_text(size= 10),
+        axis.text.y = element_text(size= 9))
+large_pop_sl_dist
+```
+
+```{r}
+small_large_size <- limpet_size %>%
+  ggplot(aes(x = size, y = sl_mm, color = size)) +
+  ggdist::stat_halfeye(adjust = 0.7, width = 0.6, justification = -0.15, aes(fill = size)) +
+  geom_boxplot(width = 0.18, outlier.shape = NA) +
+  geom_jitter(width = 0.08, height = 0, alpha = 0.20, size = 0.8) +
+  labs(x = NULL, y = "Shell length (mm)",
+       title = "Owl limpet size distribution by size"
+       ) +
+  theme(legend.position = "none")
+small_large_size
+```
+
+```{r}
+leveneTest(sl_mm~size, data = limpet_size)
+limpet_size %>%
+  group_by(season, size) %>%
+  summarise(variance = var(sl_mm),
+            mean = mean(sl_mm))
+
+m_size_lmm <- glmmTMB(
+  log(sl_mm) ~ size + (1 | plot_name),
+  data = limpet_size)
+
+check_model(m_size_lmm)
+summary(m_size_lmm)
+```
+
+##### Diagnostics
+
+```{r}
+small_large_size <- DHARMa::simulateResiduals(m_size_lmm, n = 1000)
+plot(small_large_size)
+DHARMa::testDispersion(small_large_size)
+```
+
+##### Estimated marginal means (back-transformed to mm)
+
+```{r}
+emm_small_large <- emmeans(m_size_lmm, ~ size, type = "response")
+emm_small_large
+pairs(emm_small_large, adjust = "tukey")
+```
+
+##### Figure: model-based size means
+
+```{r}
+df_small_large_emm <- as.data.frame(emm_small_large)
+
+p_small_large_emm <- ggplot(df_size_emm, aes(x = size, y = response)) +
+  ggdist::stat_slab(data = limpet_size, aes(x = size, y = sl_mm, fill = size),adjust = 0.7, width = 0.6, justification = -0.15, alpha = 0.80, show.legend = FALSE)+
+  geom_jitter(data = limpet_size, aes(x = size, y = sl_mm, color = size), width = 0.08, height = 0, alpha = 0.10, size = 0.8)+
+  geom_errorbar(data = df_small_large_emm, aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.12) +
+  scale_fill_manual(values = size_colors)+
+  scale_color_manual(values =size_colors)+
+  labs(x = NULL, y = "Estimated mean shell length (mm)",
+       title = "Size effect on owl limpet size (Gaussian GLMM)"
+       ) +
+  scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
+  theme(legend.position = "none")
+#ggsave(filename = "figure4.png", width = 14, height = 6)
+
+p_small_large_emm
+```
+
+```{r}
+limpet_size %>%
+  group_by(season) %>% 
+  summarise(n_sl= n())
+
 p_size <- limpet_size %>%
   ggplot(aes(x = season, y = sl_mm, color = season)) +
   ggdist::stat_halfeye(adjust = 0.7, width = 0.6, justification = -0.15, aes(fill = season)) +
@@ -573,10 +706,16 @@ p_size_emm <- ggplot(df_size_emm, aes(x = season, y = response)) +
   geom_jitter(data = limpet_size, aes(x = season, y = sl_mm, color = season), width = 0.08, height = 0, alpha = 0.12, size = 0.8)+
   geom_point(size = 2) +
   geom_errorbar(data = df_size_emm, aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.12) +
+   geom_signif(comparisons = list(c("Fall", "Spring")),
+             map_signif_level = TRUE, # Automatically uses asterisks for p-values
+             annotations = "**")+ # Manually set the annotation.
+   geom_signif(comparisons = list(c("Winter", "Spring")),
+              map_signif_level = TRUE, # Automatically uses asterisks for p-values
+              annotations = "***")+
   scale_fill_manual(values = season_colors)+
   scale_color_manual(values =season_colors)+
   labs(x = NULL, y = "Estimated mean shell length (mm)",
-       title = "Seasonal effect on owl limpet size (Gamma GLMM)"
+       title = "Seasonal effect on owl limpet size (Tweedie GLMM)"
        ) +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
   theme(legend.position = "none")
@@ -585,11 +724,24 @@ ggsave(filename = "figure4.png", width = 14, height = 6)
 p_size_emm
 ```
 
-### Size (`sl_mm`) by season for small individuals
+### Size (`sl_mm`) by size (>30mm) by transect
 
 Since shell length has a bimodal distribution, we decided that separating large and small would provide a a more complex story
 
 ```{r}
+small_limpet_count <- limpet_size %>% 
+  filter(size == "small") %>% 
+  group_by(season) %>% 
+  summarise(n_sl= n())
+
+small_limpet_count
+
+small_limpet_freq <- limpet_size %>% 
+  filter(size == "small") %>%
+  group_by(season) %>% 
+  mutate(rounded_sl = round(sl_mm, 0)) %>% 
+  count(rounded_sl)
+
 p_small_size <- limpet_size %>%
   filter(size == "small") %>% 
   ggplot(aes(x = season, y = sl_mm, color = season)) +
@@ -597,10 +749,10 @@ p_small_size <- limpet_size %>%
   geom_boxplot(width = 0.18, outlier.shape = NA) +
   geom_jitter(width = 0.08, height = 0, alpha = 0.20, size = 0.8) +
   labs(x = NULL, y = "Shell length (mm)",
-       title = "Owl limpet size distribution by season for individuals less than 30 mm"
+       title = "Small Limpet Size Distribution per Season"
        ) +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
-   scale_color_manual(values = season_colors)+
+  scale_color_manual(values = season_colors)+
   scale_fill_manual(values = season_colors)+
   theme(legend.position = "none")
 
@@ -608,33 +760,25 @@ p_small_size <- limpet_size %>%
 p_small_size
 ```
 
-#### Gamma GLMM with random effects for plot for small individuals
+#### GLMM to identify difference of shell length mean of small individuals per season)
 
 ```{r}
 small_sl <- limpet_size %>% 
   filter(size == "small")
 
-m_small_size_gamma <- glmmTMB(
-  sl_mm ~ season + (1 | plot_name),
-  dispformula = ~ season,  # Model dispersion as a function of season because unequal variances
-  family = Gamma(link = "log"), # better but still not the best, but I trust more this model
-  data = small_sl
-)
+m_small_size_lmer <- lmer(
+  sl_mm ~ season+(1|plot_name),  
+  data = small_sl)
 
-summary(m_small_size_gamma)
+summary(m_small_size_lmer)
+check_model(m_small_size_lmer)
 ```
 
-##### Diagnostics for small shell length
 
-```{r}
-small_sim_size <- DHARMa::simulateResiduals(m_small_size_gamma, n = 1000)
-plot(small_sim_size)
-DHARMa::testDispersion(small_sim_size)
-```
 ##### Estimated marginal means for small individuals(back-transformed to mm)
 
 ```{r}
-small_emm_size <- emmeans(m_small_size_gamma, ~ season, type = "response")
+small_emm_size <- emmeans(m_small_size_lmer, ~ season, type = "response")
 small_emm_size
 pairs(small_emm_size, adjust = "tukey")
 ```
@@ -643,11 +787,11 @@ pairs(small_emm_size, adjust = "tukey")
 ```{r}
 df_small_size_emm <- as.data.frame(small_emm_size)
 
-p_small_size_emm <- ggplot(df_small_size_emm, aes(x = season, y = response)) +
+p_small_size_emm <- ggplot(df_small_size_emm, aes(x = season, y = emmean)) +
   ggdist::stat_slab(data = small_sl, aes(x = season, y = sl_mm, fill = season),adjust = 0.7, width = 0.6, justification = -0.15, show.legend = FALSE)+
   geom_jitter(data = small_sl, aes(x = season, y = sl_mm, color = season), width = 0.08, height = 0, alpha = 0.12, size = 0.8)+
   geom_point(size = 2) +
-  geom_errorbar(data = df_small_size_emm, aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.12) +
+  geom_errorbar(data = df_small_size_emm, aes(ymin = lower.CL, ymax = upper.CL), width = 0.12) +
   scale_fill_manual(values = season_colors)+
   scale_color_manual(values =season_colors)+
   geom_signif(comparisons = list(c("Fall", "Spring")),
@@ -655,21 +799,36 @@ p_small_size_emm <- ggplot(df_small_size_emm, aes(x = season, y = response)) +
               annotations = "**")+ # Manually set the annotation.
    geom_signif(comparisons = list(c("Winter", "Spring")),
               map_signif_level = TRUE, # Automatically uses asterisks for p-values
-              annotations = "***")+
+              annotations = "**")+
   labs(x = NULL, y = "Estimated mean shell length (mm)",
-       title = "Seasonal effect on small owl limpet size (Gamma GLMM)"
+       title = "Seasonal effect on small owl limpet size (LMM)"
        ) +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
   theme(legend.position = "none")
-ggsave(filename = "smallSL.png", width = 14, height = 6)
+ggsave(filename = "p_small_size_emm.png", width = 14, height = 6)
 
 p_small_size_emm
+
 ```
-### Size (`sl_mm`) by season for large individuals
+### Size (`sl_mm`) by transect for large limpets for entire popultion
 
 Here I will analyze large individuals (>30 mm)
 
 ```{r}
+large_limpet_count <- limpet_size %>% 
+  filter(size == "large") %>% 
+  group_by(season) %>% 
+  summarise(n_sl= n())
+
+large_limpet_count
+
+large_limpet_freq <- limpet_size %>% 
+  filter(size == "large") %>%
+  group_by(season) %>% 
+  mutate(rounded_sl = round(sl_mm, 0)) %>% 
+  count(rounded_sl)
+
+
 p_large_size <- limpet_size %>%
   filter(size == "large") %>% 
   ggplot(aes(x = season, y = sl_mm, color = season)) +
@@ -677,10 +836,10 @@ p_large_size <- limpet_size %>%
   geom_boxplot(width = 0.18, outlier.shape = NA) +
   geom_jitter(width = 0.08, height = 0, alpha = 0.20, size = 0.8) +
   labs(x = NULL, y = "Shell length (mm)",
-       title = "Owl limpet size distribution by season for individuals greater than 30 mm"
+       title = "Large limpet size distribution by season"
        ) +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
-   scale_color_manual(values = season_colors)+
+  scale_color_manual(values = season_colors)+
   scale_fill_manual(values = season_colors)+
   theme(legend.position = "none")
 
@@ -688,63 +847,147 @@ p_large_size <- limpet_size %>%
 p_large_size
 ```
 
-#### Gamma GLMM with random effects for plot for small individuals
+#### LMER for large individuals
 
 ```{r}
 large_sl <- limpet_size %>% 
   filter(size == "large")
 
-m_large_size_gamma <- glmmTMB(
-  sl_mm ~ season + (1 | plot_name),
-  dispformula = ~ season,  # Model dispersion as a function of season because unequal variances
-  family = Gamma(link = "log"), # better but still not the best, but I trust more this model
-  data = large_sl
-)
+m_large_size_lmer <- lmer(
+  sl_mm ~ season+(1|plot_name),  
+  data = large_sl)
 
-summary(m_large_size_gamma)
+summary(m_large_size_lmer)
+check_model(m_large_size_lmer)
 ```
 
-##### Diagnostics for large shell length
-
-```{r}
-large_sim_size <- DHARMa::simulateResiduals(m_large_size_gamma, n = 1000)
-plot(large_sim_size)
-DHARMa::testDispersion(large_sim_size)
-```
 
 ##### Estimated marginal means for small individuals(back-transformed to mm)
 
 ```{r}
-large_emm_size <- emmeans(m_large_size_gamma, ~ season, type = "response")
+large_emm_size <- emmeans(m_large_size_lmer, ~ season, type = "response")
 large_emm_size
 pairs(large_emm_size, adjust = "tukey")
 ```
-##### Figure: model-based seasonal means for small individuals
+##### Figure: model-based seasonal means for large individuals
 
 ```{r}
 df_large_size_emm <- as.data.frame(large_emm_size)
 
-p_large_size_emm <- ggplot(df_large_size_emm, aes(x = season, y = response)) +
+p_large_size_emm <- ggplot(df_large_size_emm, aes(x = season, y = emmean)) +
   ggdist::stat_slab(data = large_sl, aes(x = season, y = sl_mm, fill = season),adjust = 0.7, width = 0.6, justification = -0.15, show.legend = FALSE)+
   geom_jitter(data = large_sl, aes(x = season, y = sl_mm, color = season), width = 0.08, height = 0, alpha = 0.12, size = 0.8)+
   geom_point(size = 2) +
-  geom_errorbar(data = df_large_size_emm, aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.12) +
+  geom_errorbar(data = df_large_size_emm, aes(ymin = lower.CL, ymax = upper.CL), width = 0.12) +
   scale_fill_manual(values = season_colors)+
   scale_color_manual(values =season_colors)+
   geom_signif(comparisons = list(c("Fall", "Spring")),
-              map_signif_level = TRUE, # Automatically uses asterisks for p-values
-              annotations = "**")+ # Manually set the annotation.
+             map_signif_level = TRUE, # Automatically uses asterisks for p-values
+             annotations = "**")+ # Manually set the annotation.
    geom_signif(comparisons = list(c("Winter", "Spring")),
               map_signif_level = TRUE, # Automatically uses asterisks for p-values
               annotations = "***")+
   labs(x = NULL, y = "Estimated mean shell length (mm)",
-       title = "Seasonal effect on large owl limpet size (Gamma GLMM)"
+       title = "Transect effect on large owl limpet size (GLMM)"
        ) +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
   theme(legend.position = "none")
-ggsave(filename = "largeSL.png", width = 14, height = 6)
+ggsave(filename = "p_large_size_emm.png", width = 14, height = 6)
 
 p_large_size_emm
+```
+
+```{r}
+season_size_transect <- limpet_size %>%
+  ggplot(aes(x = size, y = sl_mm)) +
+  geom_boxplot(width = 0.3, outlier.shape = NA) +
+  geom_jitter(aes(color = size),width = 0.1, height = 0, alpha = 0.10, size = 0.8) +
+  labs(x = NULL, y = "Shell length (mm)",
+       title = "Owl limpet size distribution by season"
+       ) +
+  scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
+   scale_color_manual(values = size_colors)+
+  theme(legend.position = "none")+
+  facet_wrap(~season)
+
+
+season_size_transect
+```
+
+```{r}
+p_size_season <- limpet_size %>%
+  ggplot(aes(x = size, y = sl_mm)) +
+  ggdist::stat_halfeye(adjust = 0.7, width = 0.6, justification = -0.15, alpha = 0.80, aes(fill = size)) +
+  geom_boxplot(width = 0.18, outlier.shape = NA) +
+  geom_jitter(aes(color = size),width = 0.08, height = 0, alpha = 0.08, size = 0.8) + #not sure if i should color the jitter 
+  labs(x = NULL, y = "Shell length (mm)",
+       title = "Owl limpet size distribution by season"
+       ) +
+  scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
+  scale_color_manual(values = size_colors)+
+  scale_fill_manual(values = size_colors)+
+  theme(legend.position = "none")+
+  facet_wrap(~season)
+
+
+p_size_season
+```
+
+```{r}
+size_season_gamma <- glmmTMB(
+  sl_mm ~ size*season + (1 | plot_name),
+  family = Gamma(link = "log"),
+  dispformula = ~ season,  # Model dispersion as a function of season because unequal variances
+  data = limpet_size)
+
+check_model(size_season_gamma)
+summary(size_season_gamma)
+```
+
+##### Diagnostics
+
+```{r}
+size_seas_sim <- DHARMa::simulateResiduals(size_season_gamma, n = 1000)
+plot(size_seas_sim)
+DHARMa::testDispersion(size_seas_sim)
+```
+
+##### Estimated marginal means for size and season(back-transformed to mm)
+
+```{r}
+size_season_emm <- emmeans(size_season_gamma, ~ size*season, type = "response")
+size_season_emm
+pairs(size_season_emm, adjust = "tukey")
+```
+
+##### Figure: model-based size means by season
+
+```{r}
+df_size_season_emm <- as.data.frame(size_season_emm)
+
+p_size_season_emm <- ggplot(df_size_season_emm, aes(x = size, y = response)) +
+  ggdist::stat_slab(data = limpet_size, aes(x = size, y = sl_mm, fill = size),adjust = 0.7, width = 0.6, justification = -0.15, alpha = 0.8, show.legend = FALSE)+
+  geom_jitter(data = limpet_size, aes(x = size, y = sl_mm, color = size), width = 0.08, height = 0, alpha = 0.08, size = 0.8)+
+  geom_point(size = 2) +
+  geom_errorbar(data = df_size_season_emm, aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.12) +
+  scale_fill_manual(values = size_colors)+
+  scale_color_manual(values =size_colors)+
+  #geom_signif(comparisons = list(c("Fall", "Spring")),
+             # map_signif_level = TRUE, # Automatically uses asterisks for p-values
+              #annotations = "**")+ # Manually set the annotation.
+   #geom_signif(comparisons = list(c("Winter", "Spring")),
+              #map_signif_level = TRUE, # Automatically uses asterisks for p-values
+              #annotations = "***")+
+  labs(x = NULL, y = "Estimated mean shell length (mm)",
+       title = "Size effect on owl limpet shell length by season (Gamma GLMM)"
+       ) +
+  scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
+  theme(legend.position = "none")+
+  facet_wrap(~season)
+ggsave(filename = "size_seasons_SL.png", width = 14, height = 6)
+
+p_size_season_emm
+
 ```
 
 ```{r}
@@ -802,8 +1045,11 @@ OL_den_sl
 ggsave(filename = "figure1.png", width = 14, height = 6)
 #title = "Seasonal effects on Owl Limpet Density and Shell Length"
 ```
+
 ##### Physical Metrics
-Because my work is heavily tied to physical changes that is correlated to seasonal change, I have pulled temperature and upwelling data from NOAA's ERDAP data. The upwelling data that I used is the CUTI(Coastal Upwelling Transport Index). Temperature data is sea surface temperature that is collected from buoys.
+Because my work is heavily tied to physical changes that is correlated to seasonal change, I have pulled temperature and upwelling data from NOAA's ERDAP data. The upwelling data that I used is the CUTI(Coastal Upwelling Transport Index). 
+Temperature data is sea surface temperature that is collected from buoys.
+
 ```{r}
 # CUTI Data
 # This pulls data
@@ -901,6 +1147,15 @@ ggsave(filename = "upline_templine_cnm.png", width = 14, height = 6)
 #title = "Seasonal effects on Owl Limpet Density and Shell Length"
 ```
 
+
+#### Site Map
+```{r}
+zone3 <- data.frame(lon = 117.246428, lat = 32.671586)
+
+map1 <- get_map(zone3)
+
+ggmap(map1)
+```
 
 
 
@@ -1269,6 +1524,117 @@ ggsave(filename = "figure2.png", width = 14, height = 6)
 #graph with brackets was saved to E:\Thesis Data\R Figures
 ```
 
+```{r}
+herb_guild <- mobile_spp %>%
+  select(Limpets, Chitons,Turbans, Periwinkles) %>% 
+  mutate(across(everything(), ~replace_na(., 0))) %>% # make the missing values zeros
+  as.matrix()
+
+select_mobiles <- mobile_alpha %>% 
+  filter(col_pres == "No") %>% 
+  select(season, transect, plot_name, col_pres, Limpets, Chitons, Turbans, Periwinkles) 
+
+name_change_limpet_den <- limpet_density %>% 
+  rename(transect = plot_name) %>% 
+  select(season, transect, size, n_limpets, area_m2, density_m2, mean_sl, sd_sl)
+
+limp_comm_join <- full_join(name_change_limpet_den, select_mobiles, by =c("season", "transect"))
+
+limp_dens_per_tran <- limp_comm_join %>% 
+  group_by(transect) %>% 
+  rowwise() %>%
+  mutate(area_all_cont = ifelse(season == "Fall", 1.4, 1.75), #fall plots are circular, this is area of a circle. I multiplied the area by 7 to get the total area of all of the controls per transect
+          total_abund = sum(c_across(all_of(colnames(herb_guild))), na.rm = TRUE),
+          total_abund_total_area = total_abund / area_all_cont,
+  ) %>%
+  ungroup()
+  
+```
+
+
+#### Scatter Plot to visualize regression of all limpet density across transects v abundance of herbivores in no central limpet plots (controls)
+```{r}
+limp_v_herbvs_plot <- limp_dens_per_tran %>% 
+  ggplot(aes(x = density_m2, y = total_abund_total_area, color= transect))+
+  geom_point()+
+  geom_smooth(method = "lm", se = TRUE, color = "blue")+
+  facet_wrap(~season)+
+  labs(x = "Owl Limpet Density", y = "Density of Competitors (total area)",
+       title = "Linear Relationship Between Owl Limpet Density and Abundance of Competitors"
+       )+
+  theme_bw()
+
+limp_v_herbvs_plot
+```
+#LMM for regression of all limpet density across transects v abundance of herbivores in no central limpet plots
+```{r}
+qqnorm(limp_dens_per_tran$total_abund_total_area)
+total_den_limp_vherbs <- lmer(
+  # Model counts with area offset to infer abundance density (per m²)
+  total_abund_total_area ~ density_m2 * season + (1 | transect),
+  data = limp_dens_per_tran)
+
+slopes <- emtrends(total_den_limp_vherbs, pairwise ~ season, var = "density_m2")
+summary(slopes)
+check_model(total_den_limp_vherbs)
+```
+
+#### Scatter Plot to visualize regression for density of competitors in non limpet plots vs density of large limpets in transects
+```{r}
+large_limp_dens_per_tran <- limp_dens_per_tran %>% 
+  filter(size == "large")%>% 
+  group_by(transect, season)
+
+large_limp_v_herbvs_plot <- large_limp_dens_per_tran %>%
+  ggplot(aes(x = density_m2, y = total_abund_total_area, color = transect))+
+  geom_point()+
+  geom_smooth(method = "lm", se = TRUE, color = "blue")+
+  facet_wrap(~season)+
+  labs(x = "Owl Limpet Density", y = "Density of Competitors (total area)",
+       title = "Linear Relationship Between Large Owl Limpet Density and Abundance of Competitors"
+       )+
+  theme_bw()
+
+large_limp_v_herbvs_plot
+```
+#####LMM for regression for density of competitors in non limpet plots vs density of large limpets in transects
+```{r}
+large_den_limp_vherbs <- lmer(total_abund_total_area ~ density_m2 * season + (1 | transect),
+  data = large_limp_dens_per_tran)
+
+large_slopes <- emtrends(large_den_limp_vherbs, pairwise ~ season, var = "density_m2")
+summary(large_slopes)
+check_model(total_den_limp_vherbs)
+```
+
+
+#### Scatter Plot to visualize regression for density of competitors in non limpet plots vs density of small limpets in transects
+```{r}
+small_limp_v_herbvs <-limp_dens_per_tran %>%
+  filter(size == "small") %>% 
+  group_by(transect, season) 
+
+small_limp_v_herbvs_plot <- small_limp_v_herbvs %>% 
+  ggplot(aes(x = density_m2, y = total_abund_total_area, color = transect))+
+  geom_point()+
+  geom_smooth(method = "lm", se = TRUE, color = "blue")+
+  facet_wrap(~season)+
+  labs(x = "Owl Limpet Density", y = "Density of Competitors (total area)",
+       title = "Linear Relationship Between Small Owl Limpet Density and Abundance of Competitors"
+       )+
+  theme_bw()
+
+small_limp_v_herbvs_plot
+```
+
+```{r}
+small_den_limp_vherbs <- lmer(total_abund_total_area ~ density_m2 * season + (1 | transect),
+  data = small_limp_v_herbvs)
+
+small_slopes <- emtrends(small_den_limp_vherbs, pairwise ~ season, var = "density_m2")
+summary(small_slopes)
+check_model(small_den_limp_vherbs)
+```
 
 ---
 
