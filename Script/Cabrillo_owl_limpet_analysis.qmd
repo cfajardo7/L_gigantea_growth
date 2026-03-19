@@ -234,10 +234,22 @@ limpet_density <- limpet_size %>%
 
 limpet_density %>% glimpse()
 
-small_density <- limpet_density %>% 
+size_limpet_density <- limpet_size %>%
+  group_by(season, date, plot_name, size) %>%
+  summarise(
+    n_limpets = n(),# count all the limpets
+    # True density (per m²) using known transect area
+    area_m2 = 20, ## double check this is correct. How long was the transect and how many meters on either size of the transect did you go? 
+    density_m2 = n_limpets / area_m2,
+    mean_sl = mean(sl_mm, na.rm = TRUE), # mean size per transect
+    sd_sl = sd(sl_mm, na.rm = TRUE), # standard deviation in size per transect
+    .groups = "drop" # drop the groupings
+  )
+
+small_density <- size_limpet_density %>% 
   filter(size == "small")
 
-large_density <- limpet_density %>% 
+large_density <- size_limpet_density%>% 
   filter(size == "large")
   
 ```
@@ -658,7 +670,7 @@ pairs(emm_small_large, adjust = "tukey")
 ```{r}
 df_small_large_emm <- as.data.frame(emm_small_large)
 
-p_small_large_emm <- ggplot(df_size_emm, aes(x = size, y = response)) +
+p_small_large_emm <- ggplot(df_small_large_emm, aes(x = size, y = response)) +
   ggdist::stat_slab(data = limpet_size, aes(x = size, y = sl_mm, fill = size),adjust = 0.7, width = 0.6, justification = -0.15, alpha = 0.80, show.legend = FALSE)+
   geom_jitter(data = limpet_size, aes(x = size, y = sl_mm, color = size), width = 0.08, height = 0, alpha = 0.10, size = 0.8)+
   geom_errorbar(data = df_small_large_emm, aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.12) +
@@ -731,7 +743,7 @@ pairs(emm_size, adjust = "tukey")
 ```{r}
 df_size_emm <- as.data.frame(emm_size)
 
-p_size_emm <- ggplot(df_size_emm, aes(x = season, y = response)) +
+p_size_emm <- ggplot(data = df_size_emm, aes(x = season, y = response)) +
   ggdist::stat_slab(data = limpet_size, aes(x = season, y = sl_mm, fill = season),adjust = 0.7, width = 0.6, justification = -0.15, show.legend = FALSE)+
   geom_jitter(data = limpet_size, aes(x = season, y = sl_mm, color = season), width = 0.08, height = 0, alpha = 0.12, size = 0.8)+
   geom_point(size = 2) +
@@ -973,7 +985,7 @@ ggsave(filename = "p_size_season.png", width = 14, height = 6)
 ## Bring the figures together for pub quality
 ## Add in stars with brackes to show significance between seasons based on emmeans
 small_large_SL <- (p_small_size+labs(title = NULL)|p_large_size_emm+labs(title = NULL))+plot_annotation(tag_levels = "a")
-emm_small_large_SL
+small_large_SL
 ggsave(filename = "emm_small_large_sl.png", width = 14, height = 6)
 #title = "Seasonal effects on Owl Limpet Density and Shell Length"
 ```
@@ -1106,7 +1118,7 @@ Temperature data is sea surface temperature that is collected from buoys.
 # This pulls data
   cnm_upwelling_data<-griddap(datasetx = "erdCUTIdaily", 
                          url = "https://oceanview.pfeg.noaa.gov/erddap/", 
-                         time = c("2023-06-15", "2024-06-15"),
+                         time = c("2023-08-15", "2024-06-15"),
                          latitude =  c(32.0, 33.0),
                          fields = "CUTI")$data %>% 
     mutate(date = as.Date(stringr::str_remove(time, "T00:00:00Z"))) %>% 
@@ -1117,38 +1129,35 @@ Temperature data is sea surface temperature that is collected from buoys.
            site = "CNM Zone III",
            season  = case_when( # make a season
              month %in% c(12,1,2) ~ "Winter",
-             month %in% c(3,4,5) ~ "Spring",
-             month %in% c(6,7,8) ~ "Summer",
-             month %in% c(9,10,11) ~ "Fall"
+             month %in% c(3,4,5,6) ~ "Spring",
+             month %in% c(8,9,10,11) ~ "Fall"
            ),
            season = factor(season),
-           season = fct_relevel(season, c("Fall","Winter","Spring","Summer")))
+           season = fct_relevel(season, c("Fall","Winter","Spring")))
   
-upw_line <- ggplot(cnm_upwelling_data, aes(x = date, y = CUTI))+
-    geom_point(aes(color = season, alpha = 2))+
-    guides(alpha = "none")+
-    geom_smooth(method = "loess", se = TRUE, color = "black")+
-  scale_color_manual(values = season_colors)+
-    labs(x=NULL, y= "Coastal Upwelling Transport Index", color = "Season")+
-    theme_bw()
+per_field_season_upwelling <- cnm_upwelling_data %>% 
+  filter(latitude == "32",
+         between(date, as.Date("2023-08-29"), as.Date("2023-10-01")) | 
+         between(date, as.Date("2024-01-10"), as.Date("2024-02-13"))|
+          between(date, as.Date("2024-05-10"), as.Date("2024-06-10")))
 
-upw_line    
   
-upw_box <- cnm_upwelling_data %>%
-    filter(latitude== "32") %>% 
-    ggplot(aes(x = as.factor(year), y = CUTI, fill = season))+
-    geom_boxplot()+
+upw_box <- per_field_season_upwelling %>%
+    ggplot(aes(x = date, y = CUTI, fill = season))+
+    geom_boxplot(width = 0.1, show.legend= FALSE)+
   scale_fill_manual(values = season_colors)+
     labs(fill = "Season",
-         x = "Year",
-         y = "Upwelling")
+         x = "Date (2023-2024)",
+         y = "Coastal Upwelling Transport Index (m^2s^-1)")+
+  facet_wrap(~season, scales = "free_x")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 upw_box
 
 ##### Temperature Data
 # This Pulls Data
 cnm_bouy_temp_data<-griddap(datasetx = "ncdcOisst21Agg_LonPM180", 
                    url = "https://coastwatch.pfeg.noaa.gov/erddap/", 
-                   time = c("2023-06-15", "2024-06-15"), 
+                   time = c("2023-08-15", "2024-06-15"), 
                    zlev = c(0,0), # this is the depth, it wants a range
                    latitude =  c(32.375,32.875),
                    longitude = c(-117.625,-117.625),
@@ -1161,40 +1170,89 @@ cnm_bouy_temp_data<-griddap(datasetx = "ncdcOisst21Agg_LonPM180",
          site = "Cabrillo National Monument",
          season  = case_when( # make a season
            month %in% c(12,1,2) ~ "Winter",
-             month %in% c(3,4,5) ~ "Spring",
-             month %in% c(6,7,8) ~ "Summer",
-             month %in% c(9,10,11) ~ "Fall"
+             month %in% c(3,4,5,6) ~ "Spring",
+             month %in% c(8,9,10,11) ~ "Fall"
          ),
          season = factor(season),
-         season = fct_relevel(season, c("Fall","Winter","Spring","Summer")))
+         season = fct_relevel(season, c("Fall","Winter","Spring")))
 
-temp_line <- ggplot(cnm_bouy_temp_data, aes(x = time, y = sst))+
-  geom_point(aes(color = season, alpha = 2))+
-    guides(alpha = "none")+
-    guides(color = "none")+
-    geom_smooth(method = "loess", se = TRUE, color = "black")+
-  scale_color_manual(values = season_colors)+
-    labs(x=NULL, y= "Sea Surface Temperature (C°)", color = "Season")+
-    theme_bw()
-temp_line
+per_field_season_temp <- cnm_bouy_temp_data %>% 
+  filter(between(time, as.Date("2023-08-29"), as.Date("2023-10-01")) | 
+         between(time, as.Date("2024-01-10"), as.Date("2024-02-13"))|
+          between(time, as.Date("2024-05-10"), as.Date("2024-06-10")))
 
-temp_box <- cnm_bouy_temp_data %>%
-    ggplot(aes(x = as.factor(year), y = sst, fill = season))+
-    geom_boxplot()+
+temp_box <- per_field_season_temp %>%
+    ggplot(aes(x = time, y = sst, fill = season))+
+    geom_boxplot(show.legend = FALSE)+
   scale_fill_manual(values = season_colors)+
-    labs(fill = "Season",
-         x = "Year",
-         y = "Sea Surface Temperature (C°)")
+    labs(x = "Date (2023-2024)",
+         y = "Sea Surface Temperature (C°)")+
+  facet_wrap(~season, scales= "free_x")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 temp_box
 
+#### Wave Data
+ cnm_fall_wave_data<-griddap(datasetx = "WaveWatch_2023", 
+                         url = "https://erddap.aoml.noaa.gov/hdb/erddap/", 
+                         time = c("2023-08-15", "2023-10-01"),
+                         latitude =  c(32.2, 32.7),
+                         longitude = c(-117.2,-117.6),
+                         fields = "Thgt")$data %>% 
+    mutate(date = as.Date(stringr::str_remove(time, "T00:00:00Z"))) %>% 
+    select(latitude, date, Thgt) %>% 
+    na.omit()%>%
+    mutate(month = month(date), # extract the month
+           year = year(date),
+           site = "CNM Zone III",
+           season  = case_when( # make a season
+             month %in% c(8,9,10,11) ~ "Fall"),
+           season = factor(season),
+           season = fct_relevel(season, "Fall"))
+ 
+ cnma_winter_spring_wave_data<-griddap(datasetx = "WaveWatch_2024", 
+                         url = "https://erddap.aoml.noaa.gov/hdb/erddap/", 
+                         time = c("2024-01-10", "2024-06-15"),
+                         latitude =  c(32.2, 32.7),
+                         longitude = c(-117.2,-117.6),
+                         fields = "Thgt")$data %>% 
+    mutate(date = as.Date(stringr::str_remove(time, "T00:00:00Z"))) %>% 
+    select(latitude, date, Thgt) %>% 
+    na.omit()%>%
+    mutate(month = month(date), # extract the month
+           year = year(date),
+           site = "CNM Zone III",
+           season  = case_when( # make a season
+             month %in% c(1,2) ~ "Winter",
+             month %in% c(3,4,5,6) ~ "Spring"),
+           season = factor(season),
+           season = fct_relevel(season, c("Winter", "Spring")))
+
+ joined_wave_data <- bind_rows(cnm_fall_wave_data,cnma_winter_spring_wave_data) %>%
+  filter(between(date, as.Date("2023-08-29"), as.Date("2023-10-01")) | 
+         between(date, as.Date("2024-01-10"), as.Date("2024-02-13"))|
+          between(date, as.Date("2024-05-10"), as.Date("2024-06-10")))
+ 
+ wave_box <- joined_wave_data %>%
+    ggplot(aes(x = date, y = Thgt, fill = season))+
+    geom_boxplot(show.legend = FALSE)+
+  scale_fill_manual(values = season_colors)+
+    labs(x = "Date (2023-2024)",
+         y = "Significant Wave Height (m)")+
+  facet_wrap(~season, scales= "free_x")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+wave_box
+ 
 ```
+
+
 ```{r}
 #| fig-width: 14
 #| fig-height: 6
 ## Bring the figures together for pub quality
-upline_templine_cnm <- (temp_line+labs(title = NULL) | upw_line+labs(title = NULL)+plot_annotation(tag_levels = "a"))
-upline_templine_cnm
-ggsave(filename = "upline_templine_cnm.png", width = 14, height = 6)
+sst_wave_upwell_cnm <- (upw_box+labs(title = NULL)+theme(axis.title.x = element_blank()) | temp_box+labs(title = NULL)+theme(axis.title.x = element_blank()) | wave_box+labs(title = NULL)+theme(axis.title.x = element_blank())) +plot_annotation(tag_levels = "a")+plot_annotation(caption = "Date (2023-2024)",
+    theme = theme(plot.caption = element_text(size = 15, face = "bold", hjust = 0.5)))
+sst_wave_upwell_cnm
+ggsave(filename = "sst_wave_upwell_cnm.png", width = 14, height = 6)
 #title = "Seasonal effects on Owl Limpet Density and Shell Length"
 ```
 
@@ -1203,11 +1261,18 @@ ggsave(filename = "upline_templine_cnm.png", width = 14, height = 6)
 ```{r}
 zone3 <- data.frame(lon = -117.2444128, lat = 32.666561)
 
-map1 <- get_map(zone3, zoom = 19, , maptype = "satellite")
+map1 <- get_map(zone3, zoom = 19, maptype = "satellite")
 
 site_map <- ggmap(map1)+
   geom_point(data = transect_coordinates, 
-             aes(x = long, y = lat, color = transect))
+             aes(x = long, y = lat, color = transect))+
+  labs(x="Longitude", y= "Latitude", color = "Transect",)+
+  scale_color_discrete(labels = c("CNM_1"= "1",
+                                  "CNM_2"="2",
+                                  "CNM_3"="3",
+                                  "CNM_4"="4",
+                                  "CNM_5"="5",
+                                  "CNM_6"="6"))
 site_map
 ggsave(filename = "site_map.png", width = 14, height = 6)
 
