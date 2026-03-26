@@ -437,7 +437,7 @@ df_small_density_emm <- as.data.frame(small_emm_density) %>%
 # Note add in stars or letters or brackets based on significance testing from the emmeans
 p_small_density_emm <- ggplot(df_small_density_emm, aes(x = season, y = density)) + 
   ggdist::stat_slab(data = small_density, aes(x = season, y = density_m2, fill = season),adjust = 0.7, width = 0.6, justification = -0.15, show.legend = FALSE)+
-  geom_jitter(data = small_density, aes(x = season, y = density_m2, color = plot_name), 
+  geom_jitter(data = small_density, aes(x = season, y = density_m2), 
               alpha = 0.8, width = 0.1)+
   geom_point(size = 4) +
   geom_errorbar(data = df_small_density_emm, aes(ymin = density_lower, ymax = density_upper), width = 0.12) +
@@ -448,16 +448,9 @@ p_small_density_emm <- ggplot(df_small_density_emm, aes(x = season, y = density)
               map_signif_level = TRUE, # Automatically uses asterisks for p-values
               annotations = "*")+
   labs(x = NULL, y = "Estimated owl limpet density (small individuals/m⁻²)",
-       color = "Transect",
        title = "Seasonal effect on small owl limpet density (model-based NB-GLMM with area offset)") +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
-  scale_fill_manual(values = season_colors)+
-  scale_color_discrete(labels = c("CNM_1"= "1",
-                                  "CNM_2"="2",
-                                  "CNM_3"="3",
-                                  "CNM_4"="4",
-                                  "CNM_5"="5",
-                                  "CNM_6"="6"))
+  scale_fill_manual(values = season_colors)
 ggsave(filename = "small.png", width = 9, height = 6)
 
 p_small_density_emm
@@ -511,7 +504,7 @@ df_large_density_emm <- as.data.frame(large_emm_density) %>%
 # Note add in stars or letters or brackets based on significance testing from the emmeans
 p_large_density_emm <- ggplot(df_large_density_emm, aes(x = season, y = density)) + 
   ggdist::stat_slab(data = large_density, aes(x = season, y = density_m2, fill = season),adjust = 0.7, width = 0.6, justification = -0.15, show.legend = FALSE)+
-  geom_jitter(data = large_density, aes(x = season, y = density_m2, color = plot_name), 
+  geom_jitter(data = large_density, aes(x = season, y = density_m2), 
               alpha = 0.8, width = 0.1)+
   geom_point(size = 4) +
   geom_errorbar(data = df_large_density_emm, aes(ymin = density_lower, ymax = density_upper), width = 0.12) +
@@ -522,17 +515,11 @@ p_large_density_emm <- ggplot(df_large_density_emm, aes(x = season, y = density)
               map_signif_level = TRUE, # Automatically uses asterisks for p-values
               annotations = "***")+
   labs(x = NULL, y = "Estimated owl limpet density (large individuals/m⁻²)",
-       color= "Transect",
        title = "Seasonal effect on large owl limpet density (model-based NB-GLMM with area offset)") +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
-  scale_fill_manual(values = season_colors)+
-  scale_color_discrete(labels = c("CNM_1"= "1",
-                                  "CNM_2"="2",
-                                  "CNM_3"="3",
-                                  "CNM_4"="4",
-                                  "CNM_5"="5",
-                                  "CNM_6"="6"))
+  scale_fill_manual(values = season_colors)
 ggsave(filename = "large.png", width = 9, height = 6)
+
 
 p_large_density_emm
 ```
@@ -545,6 +532,7 @@ p_large_density_emm
 ## Add in stars with brackes to show significance between seasons based on emmeans
 small_large_density <- (p_small_density_emm+labs(title = NULL)|p_large_density_emm+labs(title = NULL))+plot_annotation(tag_levels = "a")
 small_large_density
+
 ggsave(filename = "small_large.png", width = 14, height = 6)
 #title = "Seasonal effects on Owl Limpet Density and Shell Length"
 ```
@@ -812,6 +800,7 @@ m_small_size_lmer <- lmer(
   sl_mm ~ season+(1|plot_name),  
   data = small_sl)
 
+anova(m_small_size_lmer)
 summary(m_small_size_lmer)
 check_model(m_small_size_lmer)
 ```
@@ -899,12 +888,13 @@ m_large_size_lmer <- lmer(
   sl_mm ~ season+(1|plot_name),  
   data = large_sl)
 
+anova(m_large_size_lmer)
 summary(m_large_size_lmer)
 check_model(m_large_size_lmer)
 ```
 
 
-##### Estimated marginal means for small individuals(back-transformed to mm)
+##### Estimated marginal means for large individuals(back-transformed to mm)
 
 ```{r}
 large_emm_size <- emmeans(m_large_size_lmer, ~ season, type = "response")
@@ -1007,13 +997,13 @@ ggsave(filename = "small_large_sl.png", width = 14, height = 6)
 
 ### Gamma GLMM for shell length per season per size (large, small) 
 ```{r}
-size_season_gamma <- glmmTMB(
+size_season_gamma <- glmer(
   sl_mm ~ size*season + (1 | plot_name),
   family = Gamma(link = "log"),
-  dispformula = ~ season,  # Model dispersion as a function of season because unequal variances
   data = limpet_size)
 
 check_model(size_season_gamma)
+anova(size_season_gamma)
 summary(size_season_gamma)
 ```
 
@@ -1039,12 +1029,12 @@ pairs(size_season_emm, adjust = "tukey")
 df_size_season_emm <- as.data.frame(size_season_emm)
 
 p_size_season_emm <- ggplot(df_size_season_emm, aes(x = size, y = response)) +
-  ggdist::stat_slab(data = limpet_size, aes(x = size, y = sl_mm, fill = size),adjust = 0.7, width = 0.6, justification = -0.15, alpha = 0.8, show.legend = FALSE)+
-  geom_jitter(data = limpet_size, aes(x = size, y = sl_mm, color = size), width = 0.08, height = 0, alpha = 0.08, size = 0.8)+
+  ggdist::stat_slab(data = limpet_size, aes(x = size, y = sl_mm, fill = season),adjust = 0.7, width = 0.6, justification = -0.15, show.legend = FALSE)+
+  geom_jitter(data = limpet_size, aes(x = size, y = sl_mm, color = season), width = 0.08, height = 0, alpha = 0.12, size = 0.8)+
   geom_point(size = 2) +
   geom_errorbar(data = df_size_season_emm, aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.12) +
-  scale_fill_manual(values = size_colors)+
-  scale_color_manual(values =size_colors)+
+  scale_fill_manual(values = season_colors)+
+  scale_color_manual(values =season_colors)+
   #geom_signif(comparisons = list(c("Fall", "Spring")),
              # map_signif_level = TRUE, # Automatically uses asterisks for p-values
               #annotations = "**")+ # Manually set the annotation.
@@ -1060,6 +1050,7 @@ p_size_season_emm <- ggplot(df_size_season_emm, aes(x = size, y = response)) +
 ggsave(filename = "p_size_season_emm.png", width = 14, height = 6)
 
 p_size_season_emm
+
 
 ```
 
@@ -1134,6 +1125,13 @@ Temperature data is sea surface temperature that is collected from buoys.
            ),
            season = factor(season),
            season = fct_relevel(season, c("Fall","Winter","Spring")))
+
+per_seas_upw_summary <- cnm_upwelling_data %>% 
+  group_by(season) %>% 
+  summarize(upw_mean = mean(CUTI),
+            n = n(),
+            sd_val = sd(CUTI, na.rm = TRUE),
+            se_val = sd_val / sqrt(n))
   
 per_field_season_upwelling <- cnm_upwelling_data %>% 
   filter(latitude == "32",
@@ -1150,7 +1148,8 @@ upw_box <- per_field_season_upwelling %>%
          x = "Date (2023-2024)",
          y = "Coastal Upwelling Transport Index (m^2s^-1)")+
   facet_wrap(~season, scales = "free_x")+
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title.y = element_text(size = 16))
 upw_box
 
 ##### Temperature Data
@@ -1176,6 +1175,11 @@ cnm_bouy_temp_data<-griddap(datasetx = "ncdcOisst21Agg_LonPM180",
          season = factor(season),
          season = fct_relevel(season, c("Fall","Winter","Spring")))
 
+per_season_average <- cnm_bouy_temp_data %>% 
+  group_by(season) %>% 
+  summarize(sst_avg = mean(sst))
+per_season_average
+
 per_field_season_temp <- cnm_bouy_temp_data %>% 
   filter(between(time, as.Date("2023-08-29"), as.Date("2023-10-01")) | 
          between(time, as.Date("2024-01-10"), as.Date("2024-02-13"))|
@@ -1188,7 +1192,8 @@ temp_box <- per_field_season_temp %>%
     labs(x = "Date (2023-2024)",
          y = "Sea Surface Temperature (C°)")+
   facet_wrap(~season, scales= "free_x")+
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title.y = element_text(size = 18))
 temp_box
 
 #### Wave Data
@@ -1239,7 +1244,8 @@ temp_box
     labs(x = "Date (2023-2024)",
          y = "Significant Wave Height (m)")+
   facet_wrap(~season, scales= "free_x")+
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title.y = element_text(size = 18))
 wave_box
  
 ```
@@ -1250,7 +1256,7 @@ wave_box
 #| fig-height: 6
 ## Bring the figures together for pub quality
 sst_wave_upwell_cnm <- (upw_box+labs(title = NULL)+theme(axis.title.x = element_blank()) | temp_box+labs(title = NULL)+theme(axis.title.x = element_blank()) | wave_box+labs(title = NULL)+theme(axis.title.x = element_blank())) +plot_annotation(tag_levels = "a")+plot_annotation(caption = "Date (2023-2024)",
-    theme = theme(plot.caption = element_text(size = 15, face = "bold", hjust = 0.5)))
+    theme = theme(plot.caption = element_text(size = 20, face = "bold", hjust = 0.5)))
 sst_wave_upwell_cnm
 ggsave(filename = "sst_wave_upwell_cnm.png", width = 14, height = 6)
 #title = "Seasonal effects on Owl Limpet Density and Shell Length"
@@ -1716,10 +1722,12 @@ check_model(total_den_limp_vherbs)
 ```{r}
 large_limp_dens_per_tran <- limp_dens_per_tran %>% 
   filter(size == "large")%>% 
-  group_by(transect, season)
+  group_by(transect, season) %>% 
+  summarize(sum_density=sum(density_m2),
+    sum_transects=sum(total_abund_total_area))
 
 large_limp_v_herbvs_plot <- large_limp_dens_per_tran %>%
-  ggplot(aes(x = density_m2, y = total_abund_total_area, color = transect))+
+  ggplot(aes(x = sum_density, y = sum_transects, color = transect))+
   geom_point()+
   geom_smooth(method = "lm", se = TRUE, color = "blue")+
   facet_wrap(~season)+
@@ -1742,10 +1750,13 @@ ggsave(filename = "large_limp_v_herbvs_plot.png", width = 14, height = 6)
 
 #####LMM for regression for density of competitors in non limpet plots vs density of large limpets in transects
 ```{r}
-large_den_limp_vherbs <- lmer(total_abund_total_area ~ density_m2 * season + (1 | transect),
+large_den_limp_vherbs <- lmer(sum_transects ~ sum_density * season + (1 | transect),
   data = large_limp_dens_per_tran)
 
-large_slopes <- emtrends(large_den_limp_vherbs, pairwise ~ season, var = "density_m2")
+anova(large_den_limp_vherbs)
+summary(large_den_limp_vherbs)
+
+large_slopes <- emtrends(large_den_limp_vherbs, pairwise ~ season, var = "sum_density")
 summary(large_slopes)
 check_model(large_den_limp_vherbs)
 ```
