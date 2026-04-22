@@ -324,7 +324,7 @@ m_density <- glmmTMB(
   family = nbinom2(),
   data = limpet_density
 )
-
+check_model(m_density)
 summary(m_density)
 performance::check_overdispersion(m_density)
 performance::check_zeroinflation(m_density)
@@ -553,6 +553,7 @@ whole_pop_sl_dist <- limpet_size %>%
   ggplot(aes(x= sl_mm))+
   geom_histogram(fill= "gray",
                  colour= "black",
+                 binwidth= 5,
                  alpha=1)+
   labs(title = "Shell Length Distribution Sep 2023-June 2024",
          x = "Shell Length (mm)",
@@ -561,7 +562,7 @@ whole_pop_sl_dist <- limpet_size %>%
         axis.text.x = element_text(size = 9),
         axis.title.y = element_text(size= 10),
         axis.text.y = element_text(size= 9))+
-  geom_vline(xintercept = 34,
+  geom_vline(xintercept = 33,
              linetype="dashed")
 whole_pop_sl_dist
 ```
@@ -628,6 +629,7 @@ limpet_size %>%
   group_by(season, size) %>%
   summarise(variance = var(sl_mm),
             mean = mean(sl_mm))
+
 
 m_size_lmm <- glmmTMB(
   log(sl_mm) ~ size + (1 | plot_name),
@@ -769,8 +771,11 @@ small_limpet_count
 small_limpet_freq <- limpet_size %>% 
   filter(size == "small") %>%
   group_by(season) %>% 
-  mutate(rounded_sl = round(sl_mm, 0)) %>% 
-  count(rounded_sl)
+  mutate(rounded_sl = round(sl_mm, 0)) %>%
+    mutate(bins = cut(rounded_sl, 
+                        breaks = c(15, 20,25, 30),
+                        include.lowest = TRUE)) %>% 
+  count(bins)
 
 p_small_size <- limpet_size %>%
   filter(size == "small") %>% 
@@ -1107,7 +1112,7 @@ Temperature data is sea surface temperature that is collected from buoys.
 ```{r}
 # CUTI Data
 # This pulls data
-  cnm_upwelling_data<-griddap(datasetx = "erdCUTIdaily", 
+cnm_upwelling_data<-griddap(datasetx = "erdCUTIdaily", 
                          url = "https://oceanview.pfeg.noaa.gov/erddap/", 
                          time = c("2023-08-15", "2024-06-15"),
                          latitude =  c(32.0, 33.0),
@@ -1141,16 +1146,59 @@ per_field_season_upwelling <- cnm_upwelling_data %>%
 
   
 upw_box <- per_field_season_upwelling %>%
-    ggplot(aes(x = date, y = CUTI, fill = season))+
-    geom_boxplot(width = 0.1, show.legend= FALSE)+
+    ggplot(aes(x = season, y = CUTI, fill = season))+
+    geom_boxplot(show.legend= FALSE)+
   scale_fill_manual(values = season_colors)+
-    labs(fill = "Season",
-         x = "Date (2023-2024)",
-         y = "Coastal Upwelling Transport Index (m^2s^-1)")+
-  facet_wrap(~season, scales = "free_x")+
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        axis.title.y = element_text(size = 16))
+    labs(x = "Season",
+         y = "Coastal Upwelling Transport Index (m^2s^-1)")#+
+  #facet_wrap(~season, scales = "free_x")+
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        #axis.title.y = element_text(size = 16))
 upw_box
+
+#####BEUTI INDEX
+cnm_beuti_data<-griddap(datasetx = "erdBEUTIdaily", 
+                         url = "https://oceanview.pfeg.noaa.gov/erddap/", 
+                         time = c("2023-08-15", "2024-06-15"),
+                         latitude =  c(32.0, 33.0),
+                         fields = "BEUTI")$data %>% 
+    mutate(date = as.Date(stringr::str_remove(time, "T00:00:00Z"))) %>% 
+    select(latitude, date, BEUTI) %>% 
+    na.omit()%>%
+    mutate(month = month(date), # extract the month
+           year = year(date),
+           site = "CNM Zone III",
+           season  = case_when( # make a season
+             month %in% c(12,1,2) ~ "Winter",
+             month %in% c(3,4,5,6) ~ "Spring",
+             month %in% c(8,9,10,11) ~ "Fall"
+           ),
+           season = factor(season),
+           season = fct_relevel(season, c("Fall","Winter","Spring")))
+
+per_seas_beuti_summary <- cnm_beuti_data %>% 
+  group_by(season) %>% 
+  summarize(upw_mean = mean(BEUTI),
+            n = n(),
+            sd_val = sd(BEUTI, na.rm = TRUE),
+            se_val = sd_val / sqrt(n))
+
+per_field_season_beuti <- cnm_beuti_data %>% 
+  filter(latitude == "32",
+         between(date, as.Date("2023-08-29"), as.Date("2023-10-01")) | 
+         between(date, as.Date("2024-01-10"), as.Date("2024-02-13"))|
+          between(date, as.Date("2024-05-10"), as.Date("2024-06-10")))
+
+beuti_box <- per_field_season_beuti %>%
+    ggplot(aes(x = season, y = BEUTI, fill = season))+
+    geom_boxplot(width = 0.5, show.legend= FALSE)+
+  scale_fill_manual(values = season_colors)+
+    labs(x = "Season",
+         y = "Biologically Effective Upwelling Transport Index (mmol m-1 s-1)")#+
+  #facet_wrap(~season, scales = "free_x")+
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1),
+   #     axis.title.y = element_text(size = 16))
+beuti_box
 
 ##### Temperature Data
 # This Pulls Data
@@ -1186,14 +1234,14 @@ per_field_season_temp <- cnm_bouy_temp_data %>%
           between(time, as.Date("2024-05-10"), as.Date("2024-06-10")))
 
 temp_box <- per_field_season_temp %>%
-    ggplot(aes(x = time, y = sst, fill = season))+
+    ggplot(aes(x = season, y = sst, fill = season))+
     geom_boxplot(show.legend = FALSE)+
   scale_fill_manual(values = season_colors)+
-    labs(x = "Date (2023-2024)",
-         y = "Sea Surface Temperature (C°)")+
-  facet_wrap(~season, scales= "free_x")+
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        axis.title.y = element_text(size = 18))
+    labs(x = "Season",
+         y = "Sea Surface Temperature (C°)")#+
+  #facet_wrap(~season, scales= "free_x")+
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        #axis.title.y = element_text(size = 18))
 temp_box
 
 #### Wave Data
@@ -1238,16 +1286,43 @@ temp_box
           between(date, as.Date("2024-05-10"), as.Date("2024-06-10")))
  
  wave_box <- joined_wave_data %>%
-    ggplot(aes(x = date, y = Thgt, fill = season))+
+    ggplot(aes(x = season, y = Thgt, fill = season))+
     geom_boxplot(show.legend = FALSE)+
   scale_fill_manual(values = season_colors)+
-    labs(x = "Date (2023-2024)",
-         y = "Significant Wave Height (m)")+
-  facet_wrap(~season, scales= "free_x")+
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        axis.title.y = element_text(size = 18))
+    labs(x = "Season",
+         y = "Significant Wave Height (m)")#+
+  #facet_wrap(~season, scales= "free_x")+
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        #axis.title.y = element_text(size = 18))
 wave_box
  
+```
+
+#Stats for Physical Metrics 
+```{r}
+#BEUTI ANOVA
+beuti_anova <- aov(BEUTI~season, data=per_field_season_beuti)
+summary(beuti_anova)
+anova(beuti_anova)
+#post-hoc
+beuti_tukey <- TukeyHSD(beuti_anova)
+beuti_tukey
+
+#TEMP ANOVA
+temp_anova <- aov(sst~season, data=per_field_season_temp)
+summary(temp_anova)
+anova(temp_anova)
+#post-hoc
+temp_tukey <- TukeyHSD(temp_anova)
+temp_tukey
+
+#WAVE ANOVA
+wave_anova <- aov(Thgt~season, data = joined_wave_data)
+summary(wave_anova)
+anova(wave_anova)
+#post-hoc
+wave_tukey <- TukeyHSD(wave_anova)
+wave_tukey
 ```
 
 
@@ -1255,7 +1330,7 @@ wave_box
 #| fig-width: 14
 #| fig-height: 6
 ## Bring the figures together for pub quality
-sst_wave_upwell_cnm <- (upw_box+labs(title = NULL)+theme(axis.title.x = element_blank()) | temp_box+labs(title = NULL)+theme(axis.title.x = element_blank()) | wave_box+labs(title = NULL)+theme(axis.title.x = element_blank())) +plot_annotation(tag_levels = "a")+plot_annotation(caption = "Date (2023-2024)",
+sst_wave_upwell_cnm <- (beuti_box+labs(title = NULL)+theme(axis.title.x = element_blank()) | temp_box+labs(title = NULL)+theme(axis.title.x = element_blank()) | wave_box+labs(title = NULL)+theme(axis.title.x = element_blank())) +plot_annotation(tag_levels = "a")+plot_annotation(caption = "Season",
     theme = theme(plot.caption = element_text(size = 20, face = "bold", hjust = 0.5)))
 sst_wave_upwell_cnm
 ggsave(filename = "sst_wave_upwell_cnm.png", width = 14, height = 6)
