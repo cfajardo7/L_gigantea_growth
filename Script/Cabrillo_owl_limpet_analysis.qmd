@@ -1726,6 +1726,7 @@ ggsave(filename = "figure2.png", width = 14, height = 6)
 #graph with brackets was saved to E:\Thesis Data\R Figures
 ```
 
+#Regressions 
 ```{r}
 herb_guild <- mobile_spp %>%
   select(Limpets, Chitons,Turbans, Periwinkles) %>% 
@@ -1780,6 +1781,7 @@ limp_v_herbvs_plot <- limp_dens_per_tran %>%
 
 limp_v_herbvs_plot
 ```
+
 #LMM for regression of all limpet density across transects v abundance of herbivores in no central limpet plots
 ```{r}
 qqnorm(limp_dens_per_tran$total_abund_total_area)
@@ -1836,6 +1838,133 @@ summary(large_slopes)
 check_model(large_den_limp_vherbs)
 ```
 
+####Regression for all limpet density v large limpet density
+```{r}
+limpet_guild <- mobile_spp %>%
+  select(Limpets) %>% 
+  mutate(across(everything(), ~replace_na(., 0))) %>% # make the missing values zeros
+  as.matrix()
+
+select_limpets <- mobile_alpha %>% 
+  filter(col_pres == "No") %>% 
+  select(season, transect, plot_name, col_pres, Limpets)
+
+limp_join <- full_join(name_change_limpet_den, select_limpets, by =c("season", "transect"))
+
+limp_v_limp <- limp_join %>% 
+  group_by(transect) %>% 
+  rowwise() %>%
+  mutate(area_all_cont = ifelse(season == "Fall", 1.4, 1.75), #fall plots are circular, this is area of a circle. I multiplied the area by 7 to get the total area of all of the controls per transect
+          total_abund = sum(c_across(all_of(colnames(limpet_guild))), na.rm = TRUE),
+          total_abund_total_area = total_abund / area_all_cont,
+  ) %>%
+  ungroup()
+```
+
+#### Scatter Plot to visualize regression for density of other limpets in non limpet plots vs density of large limpets in transects
+```{r}
+large_limp_v_limp_dens_per_tran <- limp_v_limp %>% 
+  filter(size == "large")%>% 
+  group_by(transect, season) %>% 
+  summarize(sum_density=sum(density_m2),
+    sum_transects=sum(total_abund_total_area))
+
+large_limp_v_limp_plot <- large_limp_v_limp_dens_per_tran %>%
+  ggplot(aes(x = sum_density, y = sum_transects, color = transect))+
+  geom_point()+
+  geom_smooth(method = "lm", se = TRUE, color = "blue")+
+  facet_wrap(~season)+
+  labs(x = "Owl Limpet Density", y = "Density of Other Limpets (total area)",
+       color = "Transect",
+       title = "Linear Relationship Between Large Owl Limpet Density and Abundance of Competitors"
+       )+
+  theme_bw()+
+  scale_color_discrete(labels = c("CNM_1"= "1",
+                                  "CNM_2"="2",
+                                  "CNM_3"="3",
+                                  "CNM_4"="4",
+                                  "CNM_5"="5",
+                                  "CNM_6"="6"))
+
+large_limp_v_limp_plot
+ggsave(filename = "large_limp_v_limp_plot.png", width = 14, height = 6)
+```
+
+###LMM for regression for density of competitors in non limpet plots vs density of large limpets in transects
+```{r}
+large_den_limp_vlimp <- lmer(sum_transects ~ sum_density * season + (1 | transect),
+  data = large_limp_v_limp_dens_per_tran)
+anova(large_den_limp_vlimp)
+summary(large_den_limp_vlimp)
+
+limp_v_slopes <- emtrends(large_den_limp_vlimp, pairwise ~ season, var = "sum_density")
+summary(limp_v_slopes)
+check_model(large_den_limp_vlimp)
+```
+
+####Regression for all turban snail density v large limpet density
+```{r}
+turban_guild <- mobile_spp %>%
+  select(Turbans) %>% 
+  mutate(across(everything(), ~replace_na(., 0))) %>% # make the missing values zeros
+  as.matrix()
+
+select_turbans <- mobile_alpha %>% 
+  filter(col_pres == "No") %>% 
+  select(season, transect, plot_name, col_pres, Turbans)
+
+turban_join <- full_join(name_change_limpet_den, select_turbans, by =c("season", "transect"))
+
+limp_v_turbans <- turban_join %>% 
+  group_by(transect) %>% 
+  rowwise() %>%
+  mutate(area_all_cont = ifelse(season == "Fall", 1.4, 1.75), #fall plots are circular, this is area of a circle. I multiplied the area by 7 to get the total area of all of the controls per transect
+          total_abund = sum(c_across(all_of(colnames(turban_guild))), na.rm = TRUE),
+          total_abund_total_area = total_abund / area_all_cont,
+  ) %>%
+  ungroup()
+```
+
+#### Scatter Plot to visualize regression for density of turbans in non limpet plots vs density of large limpets in transects
+```{r}
+large_limp_v_turban_dens_per_tran <- limp_v_turbans %>% 
+  filter(size == "large")%>% 
+  group_by(transect, season) %>% 
+  summarize(sum_density=sum(density_m2),
+    sum_transects=sum(total_abund_total_area))
+
+large_limp_v_turban_plot <- large_limp_v_turban_dens_per_tran %>%
+  ggplot(aes(x = sum_density, y = sum_transects, color = transect))+
+  geom_point()+
+  geom_smooth(method = "lm", se = TRUE, color = "blue")+
+  facet_wrap(~season)+
+  labs(x = "Owl Limpet Density", y = "Density of Turban Snail Species (total area)",
+       color = "Transect",
+       title = "Linear Relationship Between Large Owl Limpet Density and Abundance of Competitors"
+       )+
+  theme_bw()+
+  scale_color_discrete(labels = c("CNM_1"= "1",
+                                  "CNM_2"="2",
+                                  "CNM_3"="3",
+                                  "CNM_4"="4",
+                                  "CNM_5"="5",
+                                  "CNM_6"="6"))
+
+large_limp_v_turban_plot
+ggsave(filename = "large_limp_v_turban_plot.png", width = 14, height = 6)
+```
+
+###LMM for regression for density of turbans in non limpet plots vs density of large limpets in transects
+```{r}
+large_den_limp_vturbans <- lmer(sum_transects ~ sum_density * season + (1 | transect),
+  data = large_limp_v_turban_dens_per_tran)
+anova(large_den_limp_vturbans)
+summary(large_den_limp_vturbans)
+
+limp_v_turbans_slopes <- emtrends(large_den_limp_vturbans, pairwise ~ season, var = "sum_density")
+summary(limp_v_turbans_slopes)
+check_model(large_den_limp_vturbans)
+```
 
 #### Scatter Plot to visualize regression for density of competitors in non limpet plots vs density of small limpets in transects
 ```{r}
