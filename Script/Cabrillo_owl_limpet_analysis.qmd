@@ -230,7 +230,11 @@ limpet_density <- limpet_size %>%
     mean_sl = mean(sl_mm, na.rm = TRUE), # mean size per transect
     sd_sl = sd(sl_mm, na.rm = TRUE), # standard deviation in size per transect
     .groups = "drop" # drop the groupings
-  )
+  ) %>% 
+  group_by(season) %>% 
+  mutate(mean_den = mean(density_m2),
+         sd_den = sd(density_m2),
+         sum_n = sum(n_limpets))
 
 limpet_density %>% glimpse()
 
@@ -247,10 +251,18 @@ size_limpet_density <- limpet_size %>%
   )
 
 small_density <- size_limpet_density %>% 
-  filter(size == "small")
+  filter(size == "small")%>%
+  group_by(season) %>% 
+  mutate(mean_den = mean(density_m2),
+         sd_den = sd(density_m2),
+         sum_n = sum(n_limpets))
 
 large_density <- size_limpet_density%>% 
-  filter(size == "large")
+  filter(size == "large")%>%
+  group_by(season) %>% 
+  mutate(mean_den = mean(density_m2),
+         sd_den = sd(density_m2),
+         sum_n = sum(n_limpets))
   
 ```
 
@@ -366,22 +378,25 @@ df_density_emm <- as.data.frame(emm_density) %>%
 # Note add in stars or letters or brackets based on significance testing from the emmeans
 p_density_emm <- ggplot(df_density_emm, aes(x = season, y = density)) + 
   ggdist::stat_slab(data = limpet_density, aes(x = season, y = density_m2, fill = season),adjust = 0.7, width = 0.6, justification = -0.15, show.legend = TRUE)+
-  geom_jitter(data = limpet_density, aes(x = season, y = density_m2, color = plot_name), 
-              alpha = 0.8, width = 0.1)+
+  geom_jitter(data = limpet_density, aes(x = season, y = density_m2), 
+              alpha = 0.9, width = 0.05, shape = 17)+
   geom_point(size = 4) +
   geom_errorbar(data = df_density_emm, aes(ymin = density_lower, ymax = density_upper), width = 0.12) +
-  labs(x = NULL, y = "Estimated owl limpet density (individuals/m⁻²)",
-       color = "Transect",
+  labs(x = "Season", y = "Estimated owl limpet density (individuals/m⁻²)",
        title = "Seasonal effect on owl limpet density (model-based NB-GLMM with area offset)") +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
   scale_fill_manual(values = season_colors)+
-  guides(fill = "none")+
-  scale_color_discrete(labels = c("CNM_1"= "1",
-                                  "CNM_2"="2",
-                                  "CNM_3"="3",
-                                  "CNM_4"="4",
-                                  "CNM_5"="5",
-                                  "CNM_6"="6"))
+  guides(fill = "none")+ 
+  geom_signif(comparisons = list(c("Fall", "Winter")),
+              map_signif_level = TRUE, # Automatically uses asterisks for p-values
+              annotations = "**")+
+theme(axis.title.y = element_text(size = 9))#+
+  #scale_color_discrete(labels = c("CNM_1"= "1",
+                                  #"CNM_2"="2",
+                                  #"CNM_3"="3",
+                                  #"CNM_4"="4",
+                                  #"CNM_5"="5",
+                                  #"CNM_6"="6"))
 ggsave(filename = "figure3.png", width = 9, height = 6)
 
 p_density_emm
@@ -412,8 +427,10 @@ plot(small_sim_density)
 DHARMa::testDispersion(small_sim_density)
 DHARMa::testZeroInflation(small_sim_density)
 ```
-##### Effect sizes: estimated marginal means for small individuals
 
+
+
+##### Effect sizes: estimated marginal means for small individuals
 ```{r}
 small_emm_density <- emmeans(model_small_density, ~ season, type = "response")
 # With the area offset, 'response' is on the expected count scale; divide by area to report density
@@ -609,16 +626,16 @@ large_pop_sl_dist
 ### Figure Showing Owl Limpet Shell Length Distribution by Size
 ```{r}
 small_large_size <- limpet_size %>%
-  ggplot(aes(x = size, y = sl_mm, color = size)) +
-  ggdist::stat_halfeye(adjust = 0.7, width = 0.6, justification = -0.15, aes(fill = size)) +
+  ggplot(aes(x = season, y = sl_mm, color = season)) +
+  ggdist::stat_halfeye(adjust = 0.7, width = 0.6, justification = -0.15, aes(fill = season)) +
   geom_boxplot(width = 0.18, outlier.shape = NA) +
   geom_jitter(width = 0.08, height = 0, alpha = 0.10, size = 0.8) +
-  scale_fill_manual(values = size_colors)+
-  scale_color_manual(values =size_colors)+
-  labs(x = NULL, y = "Shell length (mm)",
-       title = "Owl limpet size distribution by size"
-       ) +
+  scale_fill_manual(values = season_colors)+
+  scale_color_manual(values =season_colors)+
+  labs(x = "Season", y = "Shell length (mm)") +
   theme(legend.position = "none")
+
+ggsave(filename = "small_large_size.png", width = 14, height = 6)
 small_large_size
 ```
 
@@ -675,11 +692,14 @@ p_small_large_emm <- ggplot(df_small_large_emm, aes(x = size, y = response)) +
 
 p_small_large_emm
 ```
-
+### Figure: Shell length density distribution
 ```{r}
 limpet_size %>%
   group_by(season) %>% 
-  summarise(n_sl= n())
+  summarize(n_limpets= n()) %>% 
+  mutate(mean_lim = mean(n_limpets),
+            sd_lim = sd(n_limpets))
+            
 
 p_size <- limpet_size %>%
   ggplot(aes(x = season, y = sl_mm, color = season)) +
@@ -764,7 +784,9 @@ Since shell length has a bimodal distribution, we decided that separating large 
 small_limpet_count <- limpet_size %>% 
   filter(size == "small") %>% 
   group_by(season) %>% 
-  summarise(n_sl= n())
+  summarise(n_sl= n(),
+            mean_sl=mean(sl_mm),
+            sd_sl= sd(sl_mm))
 
 small_limpet_count
 
@@ -836,11 +858,12 @@ p_small_size_emm <- ggplot(df_small_size_emm, aes(x = season, y = emmean)) +
    geom_signif(comparisons = list(c("Winter", "Spring")),
               map_signif_level = TRUE, # Automatically uses asterisks for p-values
               annotations = "**")+
-  labs(x = NULL, y = "Estimated mean shell length (mm)",
+  labs(x = "Season", y = "Estimated mean shell length (<30mm)",
        title = "Seasonal effect on small owl limpet size (LMM)"
        ) +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
-  theme(legend.position = "none")
+  theme(legend.position = "none")+
+  theme(axis.title.y = element_text(size = 10))
 ggsave(filename = "p_small_size_emm.png", width = 14, height = 6)
 
 p_small_size_emm
@@ -854,8 +877,9 @@ Here I will analyze large individuals (>30 mm)
 large_limpet_count <- limpet_size %>% 
   filter(size == "large") %>% 
   group_by(season) %>% 
-  summarise(n_sl= n())
-
+  summarise(n_sl= n(),
+            mean_sl=mean(sl_mm),
+            sd_sl=sd(sl_mm))
 large_limpet_count
 
 large_limpet_freq <- limpet_size %>% 
@@ -920,15 +944,16 @@ p_large_size_emm <- ggplot(df_large_size_emm, aes(x = season, y = emmean)) +
   scale_color_manual(values =season_colors)+
   geom_signif(comparisons = list(c("Fall", "Spring")),
              map_signif_level = TRUE, # Automatically uses asterisks for p-values
-             annotations = "**")+ # Manually set the annotation.
+             annotations = "***")+ # Manually set the annotation.
    geom_signif(comparisons = list(c("Winter", "Spring")),
               map_signif_level = TRUE, # Automatically uses asterisks for p-values
               annotations = "***")+
-  labs(x = NULL, y = "Estimated mean shell length (mm)",
+  labs(x = "Season", y = "Estimated mean shell length (>30mm)",
        title = "Transect effect on large owl limpet size (GLMM)"
        ) +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.08)))+
-  theme(legend.position = "none")
+  theme(legend.position = "none")+
+  theme(axis.title.y = element_text(size = 10))
 ggsave(filename = "p_large_size_emm.png", width = 14, height = 6)
 
 p_large_size_emm
@@ -979,7 +1004,7 @@ ggsave(filename = "p_size_season.png", width = 14, height = 6)
 #| fig-height: 6
 ## Bring the figures together for pub quality
 ## Add in stars with brackes to show significance between seasons based on emmeans
-small_large_SL <- (p_small_size+labs(title = NULL)|p_large_size_emm+labs(title = NULL))+plot_annotation(tag_levels = "a")
+small_large_SL <- (p_small_size+labs(title = NULL)|p_large_size+labs(title = NULL))+plot_annotation(tag_levels = "a")
 small_large_SL
 ggsave(filename = "emm_small_large_sl.png", width = 14, height = 6)
 #title = "Seasonal effects on Owl Limpet Density and Shell Length"
@@ -993,7 +1018,8 @@ ggsave(filename = "emm_small_large_sl.png", width = 14, height = 6)
 #| fig-height: 6
 ## Bring the figures together for pub quality
 ## Add in stars with brackes to show significance between seasons based on emmeans
-small_large_SL <- (p_small_size+labs(title = NULL)|p_large_size+labs(title = NULL))+plot_annotation(tag_levels = "a")
+small_large_SL <- (p_small_size_emm+labs(title = NULL)|p_large_size_emm+labs(title = NULL))+plot_annotation(tag_levels = "a")
+
 small_large_SL
 ggsave(filename = "small_large_sl.png", width = 14, height = 6)
 #title = "Seasonal effects on Owl Limpet Density and Shell Length"
@@ -1099,9 +1125,9 @@ You would start with the mean values that you get from the emmeans output of the
 #| fig-height: 6
 ## Bring the figures together for pub quality
 ## Add in stars with brackes to show significance between seasons based on emmeans
-OL_den_sl <- (p_density_emm+labs(title = NULL)|p_size+labs(title = NULL)|p_cdf+labs(title = NULL))+plot_annotation(tag_levels = "a")
+OL_den_sl <- (p_small_size_emm+labs(title = NULL)|p_density_emm+labs(title = NULL))/(p_large_size_emm+labs(title = NULL)|p_cdf+labs(title = NULL))+plot_annotation(tag_levels = "a")
 OL_den_sl
-ggsave(filename = "figure1.png", width = 14, height = 6)
+ggsave(filename = "figure2.png", width = 14, height = 6)
 #title = "Seasonal effects on Owl Limpet Density and Shell Length"
 ```
 
@@ -1346,14 +1372,14 @@ map1 <- get_map(zone3, zoom = 19, maptype = "satellite")
 
 site_map <- ggmap(map1)+
   geom_point(data = transect_coordinates, 
-             aes(x = long, y = lat, color = transect))+
-  labs(x="Longitude", y= "Latitude", color = "Transect",)+
-  scale_color_discrete(labels = c("CNM_1"= "1",
-                                  "CNM_2"="2",
-                                  "CNM_3"="3",
-                                  "CNM_4"="4",
-                                  "CNM_5"="5",
-                                  "CNM_6"="6"))
+             aes(x = long, y = lat), size = 3)+
+  labs(x="Longitude", y= "Latitude")#+
+  #scale_color_discrete(labels = c("CNM_1"= "1",
+                                  #"CNM_2"="2",
+                                  #"CNM_3"="3",
+                                  #"CNM_4"="4",
+                                  #"CNM_5"="5",
+                                  #"CNM_6"="6"))
 site_map
 ggsave(filename = "site_map.png", width = 14, height = 6)
 
