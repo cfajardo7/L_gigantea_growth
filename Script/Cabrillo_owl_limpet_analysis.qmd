@@ -83,6 +83,7 @@ library(kableExtra)
 library(webshot2)
 library(rerddap)
 library(ggmap)
+register_google(key = Sys.getenv("GOOGLE_MAPS_API_KEY"))
 
 
 # A consistent plotting theme for a paper
@@ -1366,6 +1367,7 @@ ggsave(filename = "sst_wave_upwell_cnm.png", width = 14, height = 6)
 
 #### Site Map
 ```{r}
+ggmap_show_api_key()
 zone3 <- data.frame(lon = -117.2444128, lat = 32.666561)
 
 map1 <- get_map(zone3, zoom = 19, maptype = "satellite")
@@ -1382,6 +1384,7 @@ site_map <- ggmap(map1)+
                                   #"CNM_6"="6"))
 site_map
 ggsave(filename = "site_map.png", width = 14, height = 6)
+ggmap_hide_api_key()
 
 ```
 
@@ -1463,10 +1466,11 @@ adon_mobile <- adonis2(
 
 
 print(adon_mobile)
-pairwise.adonis2(x=mobile_gower ~ col_pres * season,
+mobile_adonis <- pairwise.adonis2(mobile_gower ~ col_pres * season,
                  data = mobile,
                  method = "gower",
                  p.adjust.m = "bonferroni")
+print(mobile_adonis)
 ## Need to add in the pairwise differences-- follow up with this
 #What about pairwise.adonis2()
 ```
@@ -1551,8 +1555,8 @@ p_biplot_mobile <- ggplot(sites_df, aes(NMDS1, NMDS2)) +
   # Sites
   geom_point(aes(color = season, shape = col_pres), alpha = 0.85, size = 2) +
   # Group ellipses
-  stat_ellipse(aes(group = interaction(season, col_pres), color = season),
-               level = 0.68, linewidth = 0.7, show.legend = FALSE) +
+  stat_ellipse(aes(group = interaction(season, col_pres), color = season, linetype= col_pres),
+               level = 0.68, linewidth = 0.7, show.legend = TRUE) +
   # Species arrows
   geom_segment(
     data = vec_keep,
@@ -1575,10 +1579,11 @@ p_biplot_mobile <- ggplot(sites_df, aes(NMDS1, NMDS2)) +
     title = "Mobile invertebrates NMDS biplot",
     subtitle = paste0("Stress = ", round(nmds_mobile$stress, 3)),
     color = "Season",
-    shape = "Owl limpet present?"
+    shape = "Owl limpet present?",
+    linetype = "Owl limpet present?"
   ) +
-  theme_classic()+
-  theme(legend.position = "none")
+  theme_classic()#+
+  #theme(legend.position = "none")
 
 p_biplot_mobile
 
@@ -1703,8 +1708,8 @@ combined_contrast <- rbind((limpet_emm_pairs_df),(periwinkle_emm_pairs_df), (chi
 #### Figure: total abundance by COL presence and season
 
 ```{r}
-#| fig-width: 14
-#| fig-height: 6 
+#| fig-width: 7
+#| fig-height: 8 
 
 # everything
 p_alpha <- mobile_alpha %>%
@@ -1725,9 +1730,13 @@ p_alpha <- mobile_alpha %>%
   stat_summary(position = position_dodge(width = 0.7))+
   facet_wrap(~ metric, scales = "free_x")+
           scale_y_continuous(breaks = c(1,10,100,200))+
-            labs(y = "Density (m⁻²)", x = NULL, fill = "Owl limpet present?", color = "Season", shape = "Present")+
+            labs(y = "Density (m⁻²)", x = NULL, fill = "Owl limpet present?", color = NULL, shape = "Owl limpet present?")+
+  guides(color = "none")+
+  theme(legend.title = element_text(size = 10),
+        legend.text = element_text(size = 9),
+        axis.text.x = element_text(size = 7))
       # title = "Mobile invertebrate alpha metrics vs limpet presence and season" 
-  theme(legend.position = "top")
+  #theme(legend.position = "top")
 
 ## total abundance only
 p_total <- mobile_alpha %>%
@@ -1744,15 +1753,20 @@ p_total <- mobile_alpha %>%
        ) +
   theme(legend.position = "top")
 
+p_alpha
 
 ## add in brackets for yes/no pairs for ones that are significant based on emmeans and clean up the title of total_abunc... and double check that the area is correct since I think you did it two different ways
-p_alpha+p_biplot_mobile+plot_annotation(tag_levels = "a")
-ggsave(filename = "figure2.png", width = 14, height = 6)
+p_biplot_mobile/p_alpha+plot_annotation(tag_levels = "a")
+ggsave(filename = "figure2.png", width = 7, height = 8
+       )
 
 #graph with brackets was saved to E:\Thesis Data\R Figures
 ```
 
-#Regressions 
+## 2B Regressions
+- In order to say that one community affects another, we need to run stats that shows the relationship of the density one population to another. 
+- Regressions are a way to visualize the linear relationships that specific mobiles groups have with the population of large limpets(>50 mm) normalized to the population of smaller limpets(<50mm)
+_ Then, seperate anovs models will show significance, if any, between different groups and large owl limpets
 ```{r}
 herb_guild <- mobile_spp %>%
   select(Limpets, Chitons,Turbans, Periwinkles) %>% 
@@ -1800,7 +1814,7 @@ limp_v_herbvs_plot <- limp_dens_per_tran %>%
   geom_point()+
   geom_smooth(method = "lm", se = TRUE, color = "blue")+
   facet_wrap(~season)+
-  labs(x = "Owl Limpet Density", y = "Density of Competitors (total area)",
+  labs(x = "Owl Limpet Density", y = "Density of Competitors (m⁻²)",
        title = "Linear Relationship Between Owl Limpet Density and Abundance of Competitors"
        )+
   theme_bw()
@@ -1815,7 +1829,7 @@ total_den_limp_vherbs <- lmer(
   # Model counts with area offset to infer abundance density (per m²)
   total_abund_total_area ~ density_m2 * season + (1 | transect),
   data = limp_dens_per_tran)
-
+anova(total_den_limp_vherbs)
 slopes <- emtrends(total_den_limp_vherbs, pairwise ~ season, var = "density_m2")
 summary(slopes)
 check_model(total_den_limp_vherbs)
@@ -1834,7 +1848,7 @@ large_limp_v_herbvs_plot <- large_limp_dens_per_tran %>%
   geom_point()+
   geom_smooth(method = "lm", se = TRUE, color = "blue")+
   facet_wrap(~season)+
-  labs(x = "Owl Limpet Density", y = "Density of Competitors (total area)",
+  labs(x = "Owl Limpet Density", y = "Density of Competitors (m⁻²)",
        color = "Transect",
        title = "Linear Relationship Between Large Owl Limpet Density and Abundance of Competitors"
        )+
@@ -1900,7 +1914,7 @@ large_limp_v_limp_plot <- large_limp_v_limp_dens_per_tran %>%
   geom_point()+
   geom_smooth(method = "lm", se = TRUE, color = "blue")+
   facet_wrap(~season)+
-  labs(x = "Owl Limpet Density", y = "Density of Other Limpets (total area)",
+  labs(x = "Owl Limpet Density", y = "Density of Other Limpets (m⁻²)",
        color = "Transect",
        title = "Linear Relationship Between Large Owl Limpet Density and Abundance of Competitors"
        )+
@@ -1964,7 +1978,7 @@ large_limp_v_turban_plot <- large_limp_v_turban_dens_per_tran %>%
   geom_point()+
   geom_smooth(method = "lm", se = TRUE, color = "blue")+
   facet_wrap(~season)+
-  labs(x = "Owl Limpet Density", y = "Density of Turban Snail Species (total area)",
+  labs(x = "Owl Limpet Density", y = "Density of Turban Snail Species (m⁻²)",
        color = "Transect",
        title = "Linear Relationship Between Large Owl Limpet Density and Abundance of Competitors"
        )+
@@ -1992,6 +2006,198 @@ summary(limp_v_turbans_slopes)
 check_model(large_den_limp_vturbans)
 ```
 
+####Regression for all whelk density v large limpet density
+```{r}
+whelk_guild <- mobile_spp %>%
+  select(Whelks) %>% 
+  mutate(across(everything(), ~replace_na(., 0))) %>% # make the missing values zeros
+  as.matrix()
+
+select_whelks <- mobile_alpha %>% 
+  filter(col_pres == "No") %>% 
+  select(season, transect, plot_name, col_pres, Whelks)
+
+whelk_join <- full_join(name_change_limpet_den, select_whelks, by =c("season", "transect"))
+
+limp_v_whelks <- whelk_join %>% 
+  group_by(transect) %>% 
+  rowwise() %>%
+  mutate(area_all_cont = ifelse(season == "Fall", 1.4, 1.75), #fall plots are circular, this is area of a circle. I multiplied the area by 7 to get the total area of all of the controls per transect
+          total_abund = sum(c_across(all_of(colnames(whelk_guild))), na.rm = TRUE),
+          total_abund_total_area = total_abund / area_all_cont,
+  ) %>%
+  ungroup()
+```
+
+#### Scatter Plot to visualize regression for density of whelks in non limpet plots vs density of large limpets in transects
+```{r}
+large_limp_v_whelks_dens_per_tran <- limp_v_whelks %>% 
+  filter(size == "large")%>% 
+  group_by(transect, season) %>% 
+  summarize(sum_density=sum(density_m2),
+    sum_transects=sum(total_abund_total_area))
+
+large_limp_v_whelks_plot <- large_limp_v_whelks_dens_per_tran %>%
+  ggplot(aes(x = sum_density, y = sum_transects, color = transect))+
+  geom_point()+
+  geom_smooth(method = "lm", se = TRUE, color = "blue")+
+  facet_wrap(~season)+
+  labs(x = "Owl Limpet Density", y = "Density of Whelk Species (m⁻²)",
+       color = "Transect",
+       title = "Linear Relationship Between Large Owl Limpet Density and Abundance of Whelks"
+       )+
+  theme_bw()+
+  scale_color_discrete(labels = c("CNM_1"= "1",
+                                  "CNM_2"="2",
+                                  "CNM_3"="3",
+                                  "CNM_4"="4",
+                                  "CNM_5"="5",
+                                  "CNM_6"="6"))
+
+large_limp_v_whelks_plot
+ggsave(filename = "large_limp_v_whelks_plot.png", width = 14, height = 6)
+```
+
+###LMM for regression for density of whelks in non limpet plots vs density of large limpets in transects
+```{r}
+large_den_limp_vwhelks <- lmer(sum_transects ~ sum_density * season + (1 | transect),
+  data = large_limp_v_whelks_dens_per_tran)
+anova(large_den_limp_vwhelks)
+summary(large_den_limp_vwhelks)
+
+limp_v_whelks_slopes <- emtrends(large_den_limp_vwhelks, pairwise ~ season, var = "sum_density")
+summary(limp_v_whelks_slopes)
+check_model(large_den_limp_vwhelks)
+```
+
+####Regression for all chiton density v large limpet density
+```{r}
+chiton_guild <- mobile_spp %>%
+  select(Chitons) %>% 
+  mutate(across(everything(), ~replace_na(., 0))) %>% # make the missing values zeros
+  as.matrix()
+
+select_chiton <- mobile_alpha %>% 
+  filter(col_pres == "No") %>% 
+  select(season, transect, plot_name, col_pres, Chitons)
+
+chiton_join <- full_join(name_change_limpet_den, select_chiton, by =c("season", "transect"))
+
+limp_v_chiton <- chiton_join %>% 
+  group_by(transect) %>% 
+  rowwise() %>%
+  mutate(area_all_cont = ifelse(season == "Fall", 1.4, 1.75), #fall plots are circular, this is area of a circle. I multiplied the area by 7 to get the total area of all of the controls per transect
+          total_abund = sum(c_across(all_of(colnames(chiton_guild))), na.rm = TRUE),
+          total_abund_total_area = total_abund / area_all_cont,
+  ) %>%
+  ungroup()
+```
+
+#### Scatter Plot to visualize regression for density of chitons in non limpet plots vs density of large limpets in transects
+```{r}
+large_limp_v_chiton_dens_per_tran <- limp_v_chiton %>% 
+  filter(size == "large")%>% 
+  group_by(transect, season) %>% 
+  summarize(sum_density=sum(density_m2),
+    sum_transects=sum(total_abund_total_area))
+
+large_limp_v_chiton_plot <- large_limp_v_chiton_dens_per_tran %>%
+  ggplot(aes(x = sum_density, y = sum_transects, color = transect))+
+  geom_point()+
+  geom_smooth(method = "lm", se = TRUE, color = "blue")+
+  facet_wrap(~season)+
+  labs(x = "Owl Limpet Density", y = "Density of Chiton Species (m⁻²)",
+       color = "Transect",
+       title = "Linear Relationship Between Large Owl Limpet Density and Abundance of Chitons"
+       )+
+  theme_bw()+
+  scale_color_discrete(labels = c("CNM_1"= "1",
+                                  "CNM_2"="2",
+                                  "CNM_3"="3",
+                                  "CNM_4"="4",
+                                  "CNM_5"="5",
+                                  "CNM_6"="6"))
+
+large_limp_v_chiton_plot
+ggsave(filename = "large_limp_v_chiton_plot.png", width = 14, height = 6)
+```
+
+###LMM for regression for density of chitons in non limpet plots vs density of large limpets in transects
+```{r}
+large_den_limp_vchiton <- lmer(sum_transects ~ sum_density * season + (1 | transect),
+  data = large_limp_v_chiton_dens_per_tran)
+anova(large_den_limp_vchiton)
+summary(large_den_limp_vchiton)
+
+limp_v_chiton_slopes <- emtrends(large_den_limp_vchiton, pairwise ~ season, var = "sum_density")
+summary(limp_v_chiton_slopes)
+check_model(large_den_limp_vchiton)
+```
+
+####Regression for all periwinkle density v large limpet density
+```{r}
+periwinkle_guild <- mobile_spp %>%
+  select(Periwinkles) %>% 
+  mutate(across(everything(), ~replace_na(., 0))) %>% # make the missing values zeros
+  as.matrix()
+
+select_periwinkle <- mobile_alpha %>% 
+  filter(col_pres == "No") %>% 
+  select(season, transect, plot_name, col_pres, Periwinkles)
+
+periwinkle_join <- full_join(name_change_limpet_den, select_periwinkle, by =c("season", "transect"))
+
+limp_v_periwinkle <- periwinkle_join %>% 
+  group_by(transect) %>% 
+  rowwise() %>%
+  mutate(area_all_cont = ifelse(season == "Fall", 1.4, 1.75), #fall plots are circular, this is area of a circle. I multiplied the area by 7 to get the total area of all of the controls per transect
+          total_abund = sum(c_across(all_of(colnames(periwinkle_guild))), na.rm = TRUE),
+          total_abund_total_area = total_abund / area_all_cont,
+  ) %>%
+  ungroup()
+```
+
+#### Scatter Plot to visualize regression for density of periwinkles in non limpet plots vs density of large limpets in transects
+```{r}
+large_limp_v_periwinkle_dens_per_tran <- limp_v_periwinkle %>% 
+  filter(size == "large")%>% 
+  group_by(transect, season) %>% 
+  summarize(sum_density=sum(density_m2),
+    sum_transects=sum(total_abund_total_area))
+
+large_limp_v_periwinkle_plot <- large_limp_v_periwinkle_dens_per_tran %>%
+  ggplot(aes(x = sum_density, y = sum_transects, color = transect))+
+  geom_point()+
+  geom_smooth(method = "lm", se = TRUE, color = "blue")+
+  facet_wrap(~season)+
+  labs(x = "Owl Limpet Density", y = "Density of Periwinkle Species (m⁻²)",
+       color = "Transect",
+       title = "Linear Relationship Between Large Owl Limpet Density and Abundance of Chitons"
+       )+
+  theme_bw()+
+  scale_color_discrete(labels = c("CNM_1"= "1",
+                                  "CNM_2"="2",
+                                  "CNM_3"="3",
+                                  "CNM_4"="4",
+                                  "CNM_5"="5",
+                                  "CNM_6"="6"))
+
+large_limp_v_periwinkle_plot
+ggsave(filename = "large_limp_v_chiton_plot.png", width = 14, height = 6)
+```
+
+###LMM for regression for density of periwinkles in non limpet plots vs density of large limpets in transects
+```{r}
+large_den_limp_vperiwinkle <- lmer(sum_transects ~ sum_density * season + (1 | transect),
+  data = large_limp_v_periwinkle_dens_per_tran)
+anova(large_den_limp_vperiwinkle)
+summary(large_den_limp_vperiwinkle)
+
+limp_v_periwinkle_slopes <- emtrends(large_den_limp_vperiwinkle, pairwise ~ season, var = "sum_density")
+summary(limp_v_periwinkle_slopes)
+check_model(large_den_limp_vperiwinkle)
+```
+
 #### Scatter Plot to visualize regression for density of competitors in non limpet plots vs density of small limpets in transects
 ```{r}
 small_limp_v_herbvs <-limp_dens_per_tran %>%
@@ -2010,6 +2216,7 @@ small_limp_v_herbvs_plot <- small_limp_v_herbvs %>%
 
 small_limp_v_herbvs_plot
 ```
+
 
 ```{r}
 small_den_limp_vherbs <- lmer(total_abund_total_area ~ density_m2 * season + (1 | transect),
