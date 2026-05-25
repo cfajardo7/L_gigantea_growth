@@ -1420,7 +1420,7 @@ mobile_grouped<-mobile %>%
          Turbans = rowSums(across(c(t_eiseni:t_gallina))),
          Periwinkles = rowSums(across(c(l_plena, l_keenae))),
          Whelks = m_lugubris) %>%
-  select(-c(m_lugubris:l_gigantea)) # what is -c
+  select(-c(m_lugubris:l_gigantea)) 
 
 # metadata
 mobile_meta <- c("season","date","transect","plot_name","l_r","meter_no","col_pres","t_f","tag_id")
@@ -1606,6 +1606,10 @@ mobile_alpha <- mobile_grouped %>%
   ungroup()
 
 mobile_alpha %>% select(season, col_pres, transect, total_abund) %>% glimpse()
+
+den_sum <- mobile_alpha %>% 
+  group_by(season, col_pres) %>% 
+  mutate(den_sum = sum(total_abund_m2))
 ```
 
 #### Mixed models for Individual metrics
@@ -1625,15 +1629,16 @@ emm_total <- emmeans(m_mobile_total, ~ col_pres|season, type = "response")
 pairs(emm_total, adjust = "tukey")
 
 performance::check_model(m_mobile_total)
+```
 
 # Species pairs
+```{r}
 # Limpets
 m_mobile_Limpet <- glmmTMB(
   # Model counts with area offset to infer abundance density (per m²)
   Limpets ~ col_pres * season + offset(log(area_m2)) + (1 | transect),
   family = nbinom2(),
   data = mobile_alpha)
-
 
 summary(m_mobile_Limpet)
 emm_limpet <- emmeans(m_mobile_Limpet, ~ col_pres|season, type = "response")
@@ -1642,13 +1647,30 @@ limpet_pairs <- pairs(emm_limpet, adjust = "tukey")
 limpet_emm_pairs_df <- as.data.frame(limpet_pairs, adjust = "tukey")
 performance::check_model(m_mobile_Limpet)
 
+mobile_limpets <- mobile_grouped %>%
+  rowwise() %>%
+  mutate(
+    #  mobile plot is 0.25 m² -- This is right
+    area_m2 = ifelse(season == "Fall", 0.2, 0.25), #fall plots are circular, this is area of a circle
+    limp_abund = sum(Limpets, na.rm = TRUE),
+    total_abund_m2 = limp_abund / area_m2,
+  ) %>%
+  ungroup()
+
+limpet_sum <- mobile_limpets %>%
+  select(season, col_pres, Limpets, total_abund_m2) %>% 
+  group_by(season, col_pres) %>% 
+  mutate(den_sum = sum(total_abund_m2))
+```
+
 # Periwinkles
+```{r}
+#Periwinkles
 m_mobile_Periwinkles <- glmmTMB(
   # Model counts with area offset to infer abundance density (per m²)
   Periwinkles ~ col_pres * season + offset(log(area_m2)) + (1 | transect),
   family = nbinom2(),
   data = mobile_alpha)
-
 
 summary(m_mobile_Periwinkles)
 emm_Periwinkles <- emmeans(m_mobile_Periwinkles, ~ col_pres|season, type = "response")
@@ -1656,14 +1678,16 @@ pairs(emm_Periwinkles, adjust = "tukey")
 periwinkle_pairs <- pairs(emm_Periwinkles, adjust = "tukey")
 periwinkle_emm_pairs_df <- as.data.frame(periwinkle_pairs, adjust = "tukey")
 performance::check_model(m_mobile_Periwinkles)
+```
 
+# Chitons
+```{r}
 # Chitons
 m_mobile_Chitons <- glmmTMB(
   # Model counts with area offset to infer abundance density (per m²)
   Chitons ~ col_pres * season + offset(log(area_m2)) + (1 | transect),
   family = nbinom2(),
   data = mobile_alpha)
-
 
 summary(m_mobile_Chitons)
 emm_Chitons <- emmeans(m_mobile_Chitons, ~ col_pres|season, type = "response")
@@ -1672,7 +1696,25 @@ chiton_pairs<- pairs(emm_Chitons, adjust = "tukey")
 chiton_emm_pairs_df <- as.data.frame(chiton_pairs, adjust = "tukey")
 performance::check_model(m_mobile_Chitons) #have high collineararity coefficient
 
+mobile_chitons <- mobile_grouped %>%
+  rowwise() %>%
+  mutate(
+    #  mobile plot is 0.25 m² -- This is right
+    area_m2 = ifelse(season == "Fall", 0.2, 0.25), #fall plots are circular, this is area of a circle
+    chiton_abund = sum(Chitons, na.rm = TRUE),
+    total_abund_m2 = chiton_abund / area_m2,
+  ) %>%
+  ungroup()
+
+chiton_sum <- mobile_chitons %>%
+  select(season, col_pres, Chitons, total_abund_m2) %>% 
+  group_by(season, col_pres) %>% 
+  mutate(den_sum = sum(total_abund_m2))
+```
+
+
 # Turbans
+```{r}
 m_mobile_Turbans <- glmmTMB(
   # Model counts with area offset to infer abundance density (per m²)
   Turbans ~ col_pres * season + offset(log(area_m2)) + (1 | transect),
@@ -1687,7 +1729,25 @@ turban_pairs <- pairs(emm_Turbans, adjust = "tukey")
 turban_emm_pairs_df <- as.data.frame(turban_pairs, adjust = "tukey")
 performance::check_model(m_mobile_Turbans) #have high collineararity coefficient
 
+mobile_turbans <- mobile_grouped %>%
+  rowwise() %>%
+  mutate(
+    #  mobile plot is 0.25 m² -- This is right
+    area_m2 = ifelse(season == "Fall", 0.2, 0.25), #fall plots are circular, this is area of a circle
+    turban_abund = sum(Turbans, na.rm = TRUE),
+    total_abund_m2 = turban_abund / area_m2,
+  ) %>%
+  ungroup()
+
+turban_sum <- mobile_turbans %>%
+  select(season, col_pres, Turbans, total_abund_m2) %>% 
+  group_by(season, col_pres) %>% 
+  mutate(den_sum = sum(total_abund_m2))
+
+```
+
 # Whelks
+```{r}
 m_mobile_Whelks <- glmmTMB(
   # Model counts with area offset to infer abundance density (per m²)
   Whelks ~ col_pres * season + offset(log(area_m2)) + (1 | transect),
@@ -1703,6 +1763,21 @@ whelk_emm_pairs_df <- as.data.frame(whelk_pairs, adjust = "tukey")
 performance::check_model(m_mobile_Whelks) #have high collineararity coefficient
 
 combined_contrast <- rbind((limpet_emm_pairs_df),(periwinkle_emm_pairs_df), (chiton_emm_pairs_df), (turban_emm_pairs_df), (turban_emm_pairs_df))
+
+mobile_whelks <- mobile_grouped %>%
+  rowwise() %>%
+  mutate(
+    #  mobile plot is 0.25 m² -- This is right
+    area_m2 = ifelse(season == "Fall", 0.2, 0.25), #fall plots are circular, this is area of a circle
+    whelk_abund = sum(Whelks, na.rm = TRUE),
+    total_abund_m2 = whelk_abund / area_m2,
+  ) %>%
+  ungroup()
+
+whelk_sum <- mobile_whelks %>%
+  select(season, col_pres, Whelks, total_abund_m2) %>% 
+  group_by(season, col_pres) %>% 
+  mutate(den_sum = sum(total_abund_m2))
 ```
 
 #### Figure: total abundance by COL presence and season
@@ -1768,13 +1843,35 @@ ggsave(filename = "figure2.png", width = 7, height = 8
 - Regressions are a way to visualize the linear relationships that specific mobiles groups have with the population of large limpets(>50 mm) normalized to the population of smaller limpets(<50mm)
 _ Then, seperate anovs models will show significance, if any, between different groups and large owl limpets
 ```{r}
-herb_guild <- mobile_spp %>%
+#Make herbivore guild of mobiles found in absence plots
+mobile_groups<-mobile %>%
+  filter(col_pres == "No") %>% 
+  mutate(Limpets = rowSums(across(c(l_limatula, l_scabra, l_gigantea))),
+         Chitons = rowSums(across(c(nuttallina_sp, mopalia_sp, l_hartwegii,l_dentiens))),
+         Turbans = rowSums(across(c(t_eiseni:t_gallina))),
+         Periwinkles = rowSums(across(c(l_plena, l_keenae))),
+         Whelks = m_lugubris) %>%
+  select(-c(m_lugubris:l_gigantea)) 
+
+mobile_matrix <- mobile_groups %>% 
+  select(-any_of(mobile_meta))
+
+herb_guild <- mobile_matrix %>%
   select(Limpets, Chitons,Turbans, Periwinkles) %>% 
   mutate(across(everything(), ~replace_na(., 0))) %>% # make the missing values zeros
   as.matrix()
+######
+mobile_beta <- mobile_groups %>%
+  rowwise() %>%
+  mutate(
+    #  mobile plot is 0.25 m² -- This is right
+    area_m2 = ifelse(season == "Fall", 0.2, 0.25), #fall plots are circular, this is area of a circle
+    total_abund = sum(c_across(all_of(colnames(mobile_mat))), na.rm = TRUE),
+    total_abund_m2 = total_abund / area_m2,
+  ) %>%
+  ungroup()
 
-select_mobiles <- mobile_alpha %>% 
-  filter(col_pres == "No") %>% 
+select_mobiles <- mobile_beta %>% 
   select(season, transect, plot_name, col_pres, Limpets, Chitons, Turbans, Periwinkles)
 
 herbs_limpet_density <- limpet_size %>%
@@ -1791,12 +1888,17 @@ herbs_limpet_density <- limpet_size %>%
 
 name_change_limpet_den <- herbs_limpet_density %>% 
   rename(transect = plot_name) %>% 
+  filter(size == "large") %>% 
   select(season, transect, size, n_limpets, area_m2, density_m2, mean_sl, sd_sl)
 
-limp_comm_join <- full_join(name_change_limpet_den, select_mobiles, by =c("season", "transect"))
+mobiles_dens <- select_mobiles %>%
+  group_by(season, transect) %>% 
+  select(season, transect, plot_name, Limpets, Chitons, Turbans, Periwinkles)
+  
+
+limp_comm_join <- full_join(name_change_limpet_den, mobiles_dens, by =c("season", "transect"))
 
 limp_dens_per_tran <- limp_comm_join %>% 
-  group_by(transect) %>% 
   rowwise() %>%
   mutate(area_all_cont = ifelse(season == "Fall", 1.4, 1.75), #fall plots are circular, this is area of a circle. I multiplied the area by 7 to get the total area of all of the controls per transect
           total_abund = sum(c_across(all_of(colnames(herb_guild))), na.rm = TRUE),
@@ -1839,7 +1941,7 @@ check_model(total_den_limp_vherbs)
 ```{r}
 large_limp_dens_per_tran <- limp_dens_per_tran %>% 
   filter(size == "large")%>% 
-  group_by(transect, season) %>% 
+  group_by(plot_name,season, transect) %>% 
   summarize(sum_density=sum(density_m2),
     sum_transects=sum(total_abund_total_area))
 
